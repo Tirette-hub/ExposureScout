@@ -468,11 +468,13 @@ class LinFileSystemCollector(ACollector):
 						directories.append(entry)
 
 			# walk through every directory
+			directories.sort(key=lambda x:x.name)
 			for directory in directories:
 				new_path = os.path.join(path, directory.name)
 				file.append(self.walk_through(new_path))
 
 			# create every File object
+			files.sort(key=lambda x:x.name)
 			for new_file in files:
 				new_path = os.path.join(path, new_file.name)
 				metadata = os.lstat(new_path)
