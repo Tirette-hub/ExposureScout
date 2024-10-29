@@ -99,11 +99,21 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		result = collector.export_bin()
 
 		expected = b"\x01"
-		expected += VarInt.to_bytes(len(path))
-		expected += path.encode()
-		expected += b"@A\xedN\xc7\xb0#\xe8#\xe80\x00\xde#\x1e\xf5\x06P\x0e\x92f\x1c/E\xef\x81\xe4`\x02"
-		expected += b"\x0etest_file1.txt@\x81\xa4N\xc7\xb1#\xe8#\xe8\r\xd5oy\xa3f(\xa9\x001\xd9Z\xfbJ\xdf\xd4 \x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X"
-		expected += b"\x0etest_file2.txt@\x81\xa4N\xc7\x93#\xe8#\xe8\r\xd9y\x96'\xba\x1b2\xf2\xbf,\xd4\xc9\xa9\xb9GK\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X"
+
+		test_file1 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file1.txt")
+		metadata = os.lstat(test_file1)
+		file1 = FSCollector.File(test_file1, metadata, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+		
+		test_file2 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file2.txt")
+		metadata = os.lstat(test_file2)
+		file2 = FSCollector.File(test_file2, metadata, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+		
+		test_directory = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+		metadata = os.lstat(test_directory)
+		directory = FSCollector.Directory(test_directory, metadata)
+		directory.append_all([file1, file2])
+
+		expected += directory.to_bytes()
 
 		self.assertEqual(result, expected)
 
