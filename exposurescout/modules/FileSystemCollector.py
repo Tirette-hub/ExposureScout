@@ -96,6 +96,20 @@ class File(ACollectible):
 
 		return False
 
+	def get_filename(self):
+		"""
+		Get the name of the file.
+
+		Returns:
+			The name of the file.
+		"""
+		i = 0
+		while True:
+			i -= 1
+			name = os.path.split(self.path)[i]
+			if name != '':
+				return name
+
 	def to_bytes(self, *args):
 		"""
 		Converts this File datastructure to a byte string used to store it.
@@ -240,6 +254,131 @@ class File(ACollectible):
 		"""
 		pass
 
+	def make_diff(collector, run_id_a, run_id_b, a, b, report):
+		"""
+		Run a deep recursive diff.
+
+		Arguments:
+			collector (ACollector): the reference to the File System collector class definition.
+			run_id_a (str): run_id of the first collector.
+			run_id_b (str): run_id of the second collector.
+			a (File): the first file or directory (optional).
+			b (File): the second file or directory (optional).
+			report (DiffReport): the report where to add the differences.
+
+		Raises:
+			ValueError: No file or directory provided.
+			ValueError: Two files or directories provided but their inode do not match.
+		"""
+		if a and not b:
+			element = DiffElement(run_id_a, a, DELETED)
+			report.add_diff_element(element, collector.name)
+
+			if stat.S_ISDIR(a.mode):
+				# the file is a directory so we need to find all its content
+				for file in b.get_content():
+					Directory.make_diff(collector, run_id_a, run_id_b, file, None, report)
+
+
+		elif b and not a:
+			element = DiffElement(run_id_b, b, DELETED)
+			report.add_diff_element(element, collector.name)
+
+			if stat.S_ISDIR(b.mode):
+				# the file is a directory so we need to find all its content
+				for file in b.get_content():
+					Directory.make_diff(collector, run_id_a, run_id_b, None, file, report)
+
+		elif a and b:
+			if a.inode != b.inode:
+				raise ValueError(f"Impossible to compare two files or directories which inode do not match. {a.inode} != {b.inode}.")
+
+			if stat.S_ISDIR(a.mode) and stat.S_ISDIR(b.mode):
+				# both a and b are directories
+				unique_files_a, unique_files_b = xor_list(a.get_content(), b.get_content())
+
+				# search for the changes in the files both directories have
+				for a_file in unique_files_a:
+					new_file = True
+					for b_file in unique_files_b:
+						if a_file.inode == b_file.inode:
+							# We found two files that share the same inode, so they are the same file. It must have been modified
+							if stat.S_ISDIR(a_file.mode) and stat.S_ISDIR(a_file.mode):
+								# the files are directories
+								if a_file.get_filename() == b_file.get_filename():
+									# it changed because its content changed, but not because the directory itself has been modified
+									# we need to find what did change here
+									Directory.make_diff(collector, run_id_a, run_id_b, a_file, b_file, report)
+
+								elif a_file.get_content() == b_file.get_content():
+									# name changed but not the content, we only need to record this change
+									element_a = DiffElement(run_id_a, a_file, MODIFIED)
+									element_b = DiffElement(run_id_b, b_file, MODIFIED)
+									report.add_diff_element(element_a, collector.name)
+									report.add_diff_element(element_b, collector.name)
+
+								else:
+									# name changed and content as well. we need to record both
+									element_a = DiffElement(run_id_a, a_file, MODIFIED)
+									element_b = DiffElement(run_id_b, b_file, MODIFIED)
+									report.add_diff_element(element_a, collector.name)
+									report.add_diff_element(element_b, collector.name)
+									Directory.make_diff(collector, run_id_a, run_id_b, a_file, b_file, report)
+
+							else:
+								# file is a regular file or link file
+								element_a = DiffElement(run_id_a, a_file, MODIFIED)
+								element_b = DiffElement(run_id_b, b_file, MODIFIED)
+								report.add_diff_element(element_a, collector.name)
+								report.add_diff_element(element_b, collector.name)
+
+							new_file = False
+							unique_files_b.remove(b_file)
+							# we removed from uniques_files_b all the files that are not really unique and therefore have been already processed
+							# unique_files_b shall therefore contain only the files that are strictly unique to the b collector
+
+					if new_file:
+						# elements that were in a but not in b anymore were deleted between the two snapshots
+						element_a = DiffElement(run_id_a, a_file, DELETED)
+						report.add_diff_element(element_a, collector.name)
+
+				for b_file in unique_files_b:
+					if stat.S_ISDIR(b_file.mode):
+						# the file is a directory so we need to find all the new files
+						Directory.make_diff(collector, run_id_a, run_id_b, None, b_file, report)
+					else:
+						# just add the new file
+						element_b = DiffElement(run_id_b, b_file, CREATED)
+						report.add_diff_element(element_b, collector.name)
+
+			elif stat.S_ISDIR(a.mode):
+				# b is not a directory
+				element_a = DiffElement(run_id_a, a, MODIFIED)
+				element_b = DiffElement(run_id_b, b, MODIFIED)
+				report.add_diff_element(element_a, collector.name)
+				report.add_diff_element(element_b, collector.name)
+
+				File.make_diff(collector, run_id_a, run_id_b, a, None, report)
+
+			elif stat.S_ISDIR(b.mode):
+				# a is not a directory
+				element_a = DiffElement(run_id_a, a, MODIFIED)
+				element_b = DiffElement(run_id_b, b, MODIFIED)
+				report.add_diff_element(element_a, collector.name)
+				report.add_diff_element(element_b, collector.name)
+
+				File.make_diff(collector, run_id_a, run_id_b, None, b, report)
+
+			else:
+				# both a and b are files
+				element_a = DiffElement(run_id_a, a, MODIFIED)
+				element_b = DiffElement(run_id_b, b, MODIFIED)
+				report.add_diff_element(element_a, collector.name)
+				report.add_diff_element(element_b, collector.name)
+
+		else:
+			raise ValueError('At least one file or directory should be provided to be able to make the diff between the two.')
+
 class Directory(File):
 	"""
 	Datastructure used to represent a Linux/Unix Directory.
@@ -334,6 +473,31 @@ class Directory(File):
 
 		return result
 
+	def contains_filename(self, filename):
+		"""
+		Verify if the directory contains a file with the given name.
+
+		Arguments:
+			filename (str): name to check.
+
+		Returns:
+			True if the directory contains a file or a directory with the given name, False otherwise.
+		"""
+		for f in self.content:
+			if f.get_filename() == filename:
+				return True
+
+		return False
+
+	def get_content(self):
+		"""
+		Get the list of files and directories it contains.
+
+		Returns:
+			The list of files and directories it contains.
+		"""
+		return self.content
+
 
 class LinFileSystemCollector(ACollector):
 	"""
@@ -388,6 +552,15 @@ class LinFileSystemCollector(ACollector):
 			rules (list[str]): list of path to the directories to walk.
 		"""
 		self.rules = rules
+
+	def get_content(self):
+		"""
+		Get the list of File System collector root files and directories it contains.
+
+		Returns:
+			A list of files or directories.
+		"""
+		return self.raw_result
 
 	def import_bin(self, data):
 		"""
@@ -516,7 +689,82 @@ class LinFileSystemCollector(ACollector):
 			b (LinFileSystemCollector): the second collector.
 			report (DiffReport): the report where to add the differences.
 		"""
-		pass
+		if a:
+			a_content = a.get_content()
+
+		if b:
+			b_content = b.get_content()
+
+		if a and not b:
+			for file in a_content:
+				File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, file, None, report)
+
+		elif b and not a:
+			for file in b_content:
+				File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, None, file, report)
+
+		elif a and b:
+			has_changed = False
+
+			# check if the main files and directories the collector collected do not strictly match together
+			unique_files_a, unique_files_b = xor_list(a_content, b_content)
+
+			# search for the changes
+			for a_file in unique_files_a:
+				new_file = True
+				for b_file in unique_files_b:
+					if a_file.inode == b_file.inode:
+						# We found two files that share the same inode, so they are the same file. It must have been modified
+						if stat.S_ISDIR(a_file.mode) and stat.S_ISDIR(b_file.mode):
+							# the files are directories
+							if a_file.get_filename() == b_file.get_filename():
+								# it changed because its content changed, but not because the directory itself has been modified
+								# we need to find what did change here
+								File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, a_file, b_file, report)
+
+							elif a_file.get_content() == b_file.get_content():
+								# name changed but not the content, we only need to record this change
+								element_a = DiffElement(run_id_a, a_file, MODIFIED)
+								element_b = DiffElement(run_id_b, b_file, MODIFIED)
+								report.add_diff_element(element_a, collector.name)
+								report.add_diff_element(element_b, collector.name)
+
+							else:
+								# name changed and content as well. we need to record both
+								element_a = DiffElement(run_id_a, a_file, MODIFIED)
+								element_b = DiffElement(run_id_b, b_file, MODIFIED)
+								report.add_diff_element(element_a, collector.name)
+								report.add_diff_element(element_b, collector.name)
+								File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, a_file, b_file, report)
+
+						else:
+							# file is a regular file or link file
+							element_a = DiffElement(run_id_a, a_file, MODIFIED)
+							element_b = DiffElement(run_id_b, b_file, MODIFIED)
+							report.add_diff_element(element_a, collector.name)
+							report.add_diff_element(element_b, collector.name)
+
+						new_file = False
+						unique_files_b.remove(b_file)
+						# we removed from uniques_files_b all the files that are not really unique and therefore have been already processed
+						# unique_files_b shall therefore contain only the files that are strictly unique to the b collector
+
+				if new_file:
+					# elements that were in a but not in b anymore were deleted between the two snapshots
+					element_a = DiffElement(run_id_a, a_file, DELETED)
+					report.add_diff_element(element_a, collector.name)
+
+			for b_file in unique_files_b:
+				if stat.S_ISDIR(b_file.mode):
+					# the file is a directory so we need to find all the new files
+					Directory.make_diff(collector, run_id_a, run_id_b, None, b_file, report)
+				else:
+					# just add the new file
+					element_b = DiffElement(run_id_b, b_file, CREATED)
+					report.add_diff_element(element_b, collector.name)
+
+		else:
+			raise ValueError('At least one collector should be provided to be able to make the diff between the two.')
 
 
 	def import_diff_from_report(data, run_ids, report):

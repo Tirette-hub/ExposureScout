@@ -14,7 +14,7 @@ Version:
 from .. import modules
 from ..modules import FileSystemCollector as FSCollector
 from ..core.octets import VarInt
-from ..core import tools
+from ..core import tools, report
 import unittest
 import os
 
@@ -302,3 +302,115 @@ class TestFile(unittest.TestCase):
 		result = self.directory.contains([self.file1, self.file2])
 
 		self.assertTrue(result)
+
+	def test_get_filename(self):
+		"""
+		[get_filename]
+		"""
+		result = self.file1.get_filename()
+		expected = "test_file1.txt"
+
+		self.assertEqual(result, expected)
+
+		result = self.directory.get_filename()
+		expected = "test_FileSystemCollector_dir"
+
+		self.assertEqual(result, expected)
+
+	def test_contains_filename(self):
+		"""
+		[contains_filename]
+		"""
+		result = self.directory.contains_filename("test_file1.txt")
+
+		self.assertTrue(result)
+
+		result = self.directory.contains_filename("test")
+
+		self.assertFalse(result)
+
+	def test_make_diff(self):
+		"""
+		[make_diff]
+		"""
+		run_id_a = "test_a"
+		run_id_b = "test_b"
+
+		test_file1 = "./exposurescout/tests/test_FileSystemCollector_dir/test_file1.txt"
+		file1 = FSCollector.File(test_file1, None, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+		
+		# Hardcode metadata to make it work on every machine (depending on the machine, metadata will be different, so we do not collect them as in the module)
+		file1.mode = 33188
+		file1.inode = 968625
+		file1.uid = 1000
+		file1.gid = 1000
+		file1.size = 13
+		file1.metadata_hash = b"\xd5oy\xa3f(\xa9\x001\xd9Z\xfbJ\xdf\xd4 "
+
+
+		test_file2 = "./exposurescout/tests/test_FileSystemCollector_dir/test_file2.txt"
+		file2 = FSCollector.File(test_file2, None, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+
+		# Hardcode metadata to make it work on every machine (depending on the machine, metadata will be different, so we do not collect them as in the module)
+		file2.mode = 33188
+		file2.inode = 968595
+		file2.uid = 1000
+		file2.gid = 1000
+		file2.size = 13
+		file2.metadata_hash = b"\xd9y\x96'\xba\x1b2\xf2\xbf,\xd4\xc9\xa9\xb9GK"
+
+
+		test_directory = "./exposurescout/tests/test_FileSystemCollector_dir"
+		directory = FSCollector.Directory(test_directory, None)
+		directory.append_all([file1, file2])
+
+		# Hardcode metadata to make it work on every machine (depending on the machine, metadata will be different, so we do not collect them as in the module)
+		directory.mode = 16877
+		directory.inode = 968624
+		directory.uid = 1000
+		directory.gid = 1000
+		directory.size = 4096
+		directory.metadata_hash = b"\xde#\x1e\xf5\x06P\x0e\x92f\x1c/E\xef\x81\xe4`"
+
+		expected = report.DiffReport(run_id_a, run_id_b)
+		expected.add_no_diff_collector(FSCollector.LinFileSystemCollector.name)
+
+		result = report.DiffReport(run_id_a, run_id_b)
+		result.add_no_diff_collector(FSCollector.LinFileSystemCollector.name)
+		FSCollector.File.make_diff(FSCollector.LinFileSystemCollector, run_id_a, run_id_b, self.directory, directory, result)
+
+		self.assertEqual(result, expected)
+
+		# artificially create a deleted file
+		directory.content = [file1]
+
+		expected = report.DiffReport(run_id_a, run_id_b)
+		expected.diff_elemnts = {
+			FSCollector.LinFileSystemCollector.name: {
+				FSCollector.File.element_name : [
+					report.DiffElement(run_id_a, self.file2, report.DELETED)
+				]
+			}
+		}
+
+		result = report.DiffReport(run_id_a, run_id_b)
+		FSCollector.File.make_diff(FSCollector.LinFileSystemCollector, run_id_a, run_id_b, self.directory, directory, result)
+
+		self.assertEqual(result, expected)
+
+		# artificially create a created file
+		directory.content = [file1]
+
+		expected = report.DiffReport(run_id_a, run_id_b)
+		expected.diff_elemnts = {
+			FSCollector.LinFileSystemCollector.name: {
+				FSCollector.File.element_name : [
+					report.DiffElement(run_id_b, self.file2, report.CREATED)
+				]
+			}
+		}
+
+		result = report.DiffReport(run_id_a, run_id_b)
+		FSCollector.File.make_diff(FSCollector.LinFileSystemCollector, run_id_a, run_id_b, directory, self.directory, result)
+
+		self.assertEqual(result, expected)
