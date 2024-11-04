@@ -15,6 +15,7 @@ from .octets import VarInt
 CREATED = 0
 DELETED = 1
 MODIFIED = 2
+UNKNOWN = 3
 
 
 def parse_snap_header(data):

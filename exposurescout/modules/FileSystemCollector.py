@@ -16,7 +16,7 @@ Version:
 from .Collector import ACollector, ACollectible
 from ..core.tools import get_file_hash, xor_list, ResultThread
 from ..core.octets import VarInt
-from ..core.report import DiffElement, AlreadyExistsException, CREATED, DELETED, MODIFIED
+from ..core.report import DiffElement, AlreadyExistsException, CREATED, DELETED, MODIFIED, UNKNOWN
 
 import subprocess
 import threading
@@ -41,7 +41,7 @@ class DiffFile(ACollectible):
 		inode (int): metadata.st_ino.
 		uid (int): metadata.st_uid.
 		gid (int): metadata.st_gid.
-		size (int): metadata.st_size.
+		size (int): file size.
 		metadata_hash (bytes): hash of the metadata.
 		content_hash (bytes): hash of the file's content.
 	"""
@@ -165,7 +165,7 @@ class DiffFile(ACollectible):
 			content_hash = data[i:i+16]
 			i += 16
 
-			file = File(path, None, content_hash)
+			file = File(path, None, 0, content_hash)
 
 		file.mode = mode
 		file.inode = inode
@@ -199,23 +199,24 @@ class File(ACollectible):
 		inode (int): metadata.st_ino.
 		uid (int): metadata.st_uid.
 		gid (int): metadata.st_gid.
-		size (int): metadata.st_size.
+		size (int): file size.
 		metadata_hash (bytes): hash of the metadata.
 		content_hash (bytes): hash of the file's content.
 	"""
 
 	element_name = "File"
 
-	def __init__(self, path, metadata, content_hash):
+	def __init__(self, path, metadata, size, content_hash):
 		super(File, self).__init__()
 		self.path = path
+
+		self.size = size
 
 		if metadata:
 			self.mode = metadata.st_mode
 			self.inode = metadata.st_ino
 			self.uid = metadata.st_uid
 			self.gid = metadata.st_gid
-			self.size = metadata.st_size
 
 			hash_val = md5()
 			hash_val.update(self.path.encode())
@@ -231,7 +232,6 @@ class File(ACollectible):
 			self.inode = None
 			self.uid = None
 			self.gid = None
-			self.size = None
 
 			self.metadata_hash = None
 
@@ -401,7 +401,7 @@ class File(ACollectible):
 
 			rest = data[i:]
 
-			file = File(path, None, content_hash)
+			file = File(path, None, 0, content_hash)
 
 		file.mode = mode
 		file.inode = inode
@@ -573,7 +573,7 @@ class Directory(File):
 	element_name = "Directory"
 
 	def __init__(self, path, metadata):
-		super(Directory, self).__init__(path, metadata, None)
+		super(Directory, self).__init__(path, metadata, 0, None)
 		self.content = []
 
 	def __str__(self):
@@ -605,6 +605,18 @@ class Directory(File):
 			file (File): File or Directory object to add in this directory.
 		"""
 		self.content.append(file)
+		self.size += file.size
+
+		# recompute everything
+		hash_val = md5()
+		hash_val.update(self.path.encode())
+		hash_val.update(f"{self.mode}".encode())
+		hash_val.update(f"{self.inode}".encode())
+		hash_val.update(f"{self.uid}".encode())
+		hash_val.update(f"{self.gid}".encode())
+		hash_val.update(f"{self.size}".encode())
+		self.metadata_hash = hash_val.digest()
+
 
 	def append_all(self, file_list):
 		"""
@@ -613,7 +625,8 @@ class Directory(File):
 		Arguments:
 			file_list (list[File]): list of File or Directory object to add in this directory.
 		"""
-		self.content += file_list
+		for file in file_list:
+			self.append(file)
 
 	def has(self, file):
 		"""
@@ -654,6 +667,34 @@ class Directory(File):
 		for f in self.content:
 			if f.get_filename() == filename:
 				return True
+
+		return False
+
+	def contains_inode(self, inode):
+		"""
+		verify if the directory contains a file with the given inode.
+
+		Arguments:
+			inode (int): inode to check.
+
+		Returns:
+			True if the directory contains a file or a directory with the given inode, False otherwise.
+		"""
+		for f in self.content:
+			if f.inode == inode:
+				return True
+
+		return False
+
+	def is_parent_of(self, file):
+		"""
+		Verify that this directory is a parent or an ancestor of a given file.
+
+		Returns:
+			True if file is in the sub-tree
+		"""
+		if os.path.normpath(file.path).startswith(os.path.normpath(self.path)):
+			return True
 
 		return False
 
@@ -790,7 +831,8 @@ class LinFileSystemCollector(ACollector):
 		if os.path.isfile(path):
 			# create the File data structure
 			content_hash = get_file_hash(path)
-			file = File(path, metadata, content_hash)
+			size = os.path.getsize(path)
+			file = File(path, metadata, size, content_hash)
 
 		else:
 			directories = []
@@ -882,6 +924,7 @@ class LinFileSystemCollector(ACollector):
 				new_file = True
 				for b_file in unique_files_b:
 					if a_file.inode == b_file.inode:
+						new_file = False
 						# We found two files that share the same inode, so they are the same file. It must have been modified
 						if stat.S_ISDIR(a_file.mode) and stat.S_ISDIR(b_file.mode):
 							# the files are directories
@@ -912,10 +955,118 @@ class LinFileSystemCollector(ACollector):
 							report.add_diff_element(element_a, LinFileSystemCollector.name)
 							report.add_diff_element(element_b, LinFileSystemCollector.name)
 
-						new_file = False
 						unique_files_b.remove(b_file)
 						# we removed from uniques_files_b all the files that are not really unique and therefore have been already processed
 						# unique_files_b shall therefore contain only the files that are strictly unique to the b collector
+
+					elif stat.S_ISDIR(a_file.mode) and a_file.is_parent_of(b_file):
+						new_file = False
+						# find the moment we can start the diff, for all the previous data that a_file contains we don't see with b_file, then mark them as unknown
+						found = False
+						directory = a_file
+						directories = [directory]
+
+						element_a = DiffElement(run_id_a, DiffFile(directory), UNKNOWN)
+						report.add_diff_element(element_a, LinFileSystemCollector.name)
+
+						while len(directories) > 0:
+							directory = directories.pop(0)
+							for file in directory.get_content():
+								if file.inode != b_file.inode:
+									element_a = DiffElement(run_id_a, DiffFile(file), UNKNOWN)
+									report.add_diff_element(element_a, LinFileSystemCollector.name)
+									if stat.S_ISDIR(file.mode):
+										directories.append(file)
+								else:
+									found = True
+									# we found the elements that are similar
+									if stat.S_ISDIR(file.mode) and stat.S_ISDIR(b_file.mode):
+										# the files are directories
+										if file.get_metadata() == b_file.get_metadata() and file.get_filename() == b_file.get_filename():
+											# it changed because its content changed, but not because the directory itself has been modified
+											# we need to find what did change here
+											File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, file, b_file, report)
+
+										elif file.get_content() == b_file.get_content():
+											# name or another data part of metadata changed but not the content, we only need to record this change
+											element_a = DiffElement(run_id_a, DiffFile(file), MODIFIED)
+											element_b = DiffElement(run_id_b, DiffFile(b_file), MODIFIED)
+											report.add_diff_element(element_a, LinFileSystemCollector.name)
+											report.add_diff_element(element_b, LinFileSystemCollector.name)
+
+										else:
+											# name changed and content as well. we need to record both
+											element_a = DiffElement(run_id_a, DiffFile(file), MODIFIED)
+											element_b = DiffElement(run_id_b, DiffFile(b_file), MODIFIED)
+											report.add_diff_element(element_a, LinFileSystemCollector.name)
+											report.add_diff_element(element_b, LinFileSystemCollector.name)
+											File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, file, b_file, report)
+
+									else:
+										# file is a regular file or link file
+										element_a = DiffElement(run_id_a, DiffFile(file), MODIFIED)
+										element_b = DiffElement(run_id_b, DiffFile(b_file), MODIFIED)
+										report.add_diff_element(element_a, LinFileSystemCollector.name)
+										report.add_diff_element(element_b, LinFileSystemCollector.name)
+
+						if found:
+							unique_files_b.remove(b_file)
+							# we removed from uniques_files_b all the files that are not really unique and therefore have been already processed
+							# unique_files_b shall therefore contain only the files that are strictly unique to the b collector
+
+					elif stat.S_ISDIR(b_file.mode) and b_file.is_parent_of(a_file):
+						# find the moment we can start the diff, for all the previous data that b_file contains we don't see with a_file, then mark them as unknown
+						found = False
+						directory = b_file
+						directories = [directory]
+
+						element_b = DiffElement(run_id_b, DiffFile(directory), UNKNOWN)
+						report.add_diff_element(element_b, LinFileSystemCollector.name)
+
+						while len(directories) > 0:
+							directory = directories.pop(0)
+							for file in directory.get_content():
+								if file.inode != a_file.inode:
+									element_b = DiffElement(run_id_b, DiffFile(file), UNKNOWN)
+									report.add_diff_element(element_b, LinFileSystemCollector.name)
+									if stat.S_ISDIR(file.mode):
+										directories.append(file)
+								else:
+									found = True
+									# we found the elements that are similar
+									if stat.S_ISDIR(file.mode) and stat.S_ISDIR(a_file.mode):
+										# the files are directories
+										if file.get_metadata() == a_file.get_metadata() and file.get_filename() == a_file.get_filename():
+											# it changed because its content changed, but not because the directory itself has been modified
+											# we need to find what did change here
+											File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, a_file, file, report)
+
+										elif file.get_content() == a_file.get_content():
+											# name or another data part of metadata changed but not the content, we only need to record this change
+											element_a = DiffElement(run_id_a, DiffFile(a_file), MODIFIED)
+											element_b = DiffElement(run_id_b, DiffFile(file), MODIFIED)
+											report.add_diff_element(element_a, LinFileSystemCollector.name)
+											report.add_diff_element(element_b, LinFileSystemCollector.name)
+
+										else:
+											# name changed and content as well. we need to record both
+											element_a = DiffElement(run_id_a, DiffFile(a_file), MODIFIED)
+											element_b = DiffElement(run_id_b, DiffFile(file), MODIFIED)
+											report.add_diff_element(element_a, LinFileSystemCollector.name)
+											report.add_diff_element(element_b, LinFileSystemCollector.name)
+											File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, a_file, file, report)
+
+									else:
+										# file is a regular file or link file
+										element_a = DiffElement(run_id_a, DiffFile(a_file), MODIFIED)
+										element_b = DiffElement(run_id_b, DiffFile(file), MODIFIED)
+										report.add_diff_element(element_a, LinFileSystemCollector.name)
+										report.add_diff_element(element_b, LinFileSystemCollector.name)
+
+						if found:
+							unique_files_b.remove(b_file)
+							# we removed from uniques_files_b all the files that are not really unique and therefore have been already processed
+							# unique_files_b shall therefore contain only the files that are strictly unique to the b collector
 
 				if new_file:
 					# elements that were in a but not in b anymore were deleted between the two snapshots
