@@ -25,6 +25,44 @@ class TestLinFileSystemCollector(unittest.TestCase):
 	def setUpClass(self):
 		print(f"\nBegining tests on the Linux/Unix File System Collector.")
 
+		path = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+
+		test_file1 = os.path.join(path, "test_file1.txt")
+		self.file1 = FSCollector.File(test_file1, None, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+		
+		# Hardcode metadata to make it work on every machine (depending on the machine, metadata will be different, so we do not collect them as in the module)
+		self.file1.mode = 33188
+		self.file1.inode = 968625
+		self.file1.uid = 1001
+		self.file1.gid = 1001
+		self.file1.size = 13
+		self.file1.metadata_hash = b"\xd5oy\xa3f(\xa9\x001\xd9Z\xfbJ\xdf\xd3 "
+
+
+		test_file2 = os.path.join(path, "test_file2.txt")
+		self.file2 = FSCollector.File(test_file2, None, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+
+		# Hardcode metadata to make it work on every machine (depending on the machine, metadata will be different, so we do not collect them as in the module)
+		self.file2.mode = 33188
+		self.file2.inode = 968595
+		self.file2.uid = 1001
+		self.file2.gid = 1001
+		self.file2.size = 13
+		self.file2.metadata_hash = b"\xd9y\x96'\xba\x1b2\xf2\xbf,\xd4\xc9\xa9\xb3GK"
+
+
+		test_directory = path
+		self.directory = FSCollector.Directory(test_directory, None)
+		self.directory.append_all([self.file1, self.file2])
+
+		# Hardcode metadata to make it work on every machine (depending on the machine, metadata will be different, so we do not collect them as in the module)
+		self.directory.mode = 16877
+		self.directory.inode = 968624
+		self.directory.uid = 1001
+		self.directory.gid = 1001
+		self.directory.size = 4096
+		self.directory.metadata_hash = b"\xde#\x1e\xf5\x06P\x0e\x92f\x1c/E\xef\x81\xe3`"
+
 	@classmethod
 	def setUp(self):
 		print(f"testing new method...")
@@ -66,7 +104,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		"""
 		[walk_through]
 		"""
-		path = os.path.join(os.path.dirname(__file__), "./test_FileSystemCollector_dir/")
+		path = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/")
 
 		collector = FSCollector.LinFileSystemCollector()
 		result = collector.walk_through(path)
@@ -102,11 +140,11 @@ class TestLinFileSystemCollector(unittest.TestCase):
 
 		test_file1 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file1.txt")
 		metadata = os.lstat(test_file1)
-		file1 = FSCollector.File(test_file1, metadata, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+		file1 = FSCollector.File(test_file1, metadata, tools.get_file_hash(test_file1))
 		
 		test_file2 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file2.txt")
 		metadata = os.lstat(test_file2)
-		file2 = FSCollector.File(test_file2, metadata, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+		file2 = FSCollector.File(test_file2, metadata, tools.get_file_hash(test_file2))
 		
 		test_directory = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
 		metadata = os.lstat(test_directory)
@@ -170,6 +208,74 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		expected = [directory]
 
 		self.assertEqual(result, expected)
+
+	def test_make_diff(self):
+		"""
+		[make_diff]
+		"""
+		run_id_a = "test_a"
+		run_id_b = "test_b"
+
+		path = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+
+		collector_a = FSCollector.LinFileSystemCollector()
+		collector_a.set_rule(path)
+		collector_a.run()
+
+
+		test_file1 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file1.txt")
+		metadata = os.lstat(test_file1)
+		file1 = FSCollector.File(test_file1, metadata, tools.get_file_hash(test_file1))
+		
+		test_file2 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file2.txt")
+		metadata = os.lstat(test_file2)
+		file2 = FSCollector.File(test_file2, metadata, tools.get_file_hash(test_file2))
+		
+		test_directory = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+		metadata = os.lstat(test_directory)
+		directory = FSCollector.Directory(test_directory, metadata)
+		directory.append_all([file1, file2])
+
+
+		expected = report.DiffReport(run_id_a, run_id_b)
+		expected.diff_elemnts = {
+			'File System Collector': {
+				'File': [
+					report.DiffElement(run_id_a, FSCollector.DiffFile(directory), report.DELETED),
+					report.DiffElement(run_id_a, FSCollector.DiffFile(file1), report.DELETED),
+					report.DiffElement(run_id_a, FSCollector.DiffFile(file2), report.DELETED),
+				]
+			}
+		}
+
+		result = report.DiffReport(run_id_a, run_id_b)
+		FSCollector.LinFileSystemCollector.make_diff(run_id_a, run_id_b, collector_a, None, result)
+
+		self.assertEqual(result, expected)
+
+		collector_b = FSCollector.LinFileSystemCollector()
+		collector_b.raw_result = [self.directory]
+
+		expected.diff_elemnts = {
+			'File System Collector': {
+				'File': [
+					report.DiffElement(run_id_a, FSCollector.DiffFile(directory), report.MODIFIED),
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.directory), report.MODIFIED),
+					report.DiffElement(run_id_a, FSCollector.DiffFile(file1), report.MODIFIED),
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.file1), report.MODIFIED),
+					report.DiffElement(run_id_a, FSCollector.DiffFile(file2), report.MODIFIED),
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.file2), report.MODIFIED),
+				]
+			}
+		}
+
+		result = report.DiffReport(run_id_a, run_id_b)
+		FSCollector.LinFileSystemCollector.make_diff(run_id_a, run_id_b, collector_a, collector_b, result)
+
+		self.assertNotEqual(collector_a, collector_b)
+		self.assertEqual(result, expected)
+
+
 
 
 class TestFile(unittest.TestCase):
@@ -388,7 +494,7 @@ class TestFile(unittest.TestCase):
 		expected.diff_elemnts = {
 			FSCollector.LinFileSystemCollector.name: {
 				FSCollector.File.element_name : [
-					report.DiffElement(run_id_a, self.file2, report.DELETED)
+					report.DiffElement(run_id_a, FSCollector.DiffFile(self.file2), report.DELETED)
 				]
 			}
 		}
@@ -405,7 +511,7 @@ class TestFile(unittest.TestCase):
 		expected.diff_elemnts = {
 			FSCollector.LinFileSystemCollector.name: {
 				FSCollector.File.element_name : [
-					report.DiffElement(run_id_b, self.file2, report.CREATED)
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.file2), report.CREATED)
 				]
 			}
 		}
@@ -414,3 +520,105 @@ class TestFile(unittest.TestCase):
 		FSCollector.File.make_diff(FSCollector.LinFileSystemCollector, run_id_a, run_id_b, directory, self.directory, result)
 
 		self.assertEqual(result, expected)
+
+
+class TestDiffFile(unittest.TestCase):
+	@classmethod
+	def setUpClass(self):
+		print(f"\nBegining tests on the Linux/Unix File System Collector.")
+		test_file1 = "./exposurescout/tests/test_FileSystemCollector_dir/test_file1.txt"
+		file1 = FSCollector.File(test_file1, None, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+		
+		# Hardcode metadata to make it work on every machine (depending on the machine, metadata will be different, so we do not collect them as in the module)
+		file1.mode = 33188
+		file1.inode = 968625
+		file1.uid = 1000
+		file1.gid = 1000
+		file1.size = 13
+		file1.metadata_hash = b"\xd5oy\xa3f(\xa9\x001\xd9Z\xfbJ\xdf\xd4 "
+
+		self.file1 = FSCollector.DiffFile(file1)
+
+
+		test_file2 = "./exposurescout/tests/test_FileSystemCollector_dir/test_file2.txt"
+		file2 = FSCollector.File(test_file2, None, b"\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X")
+
+		# Hardcode metadata to make it work on every machine (depending on the machine, metadata will be different, so we do not collect them as in the module)
+		file2.mode = 33188
+		file2.inode = 968595
+		file2.uid = 1000
+		file2.gid = 1000
+		file2.size = 13
+		file2.metadata_hash = b"\xd9y\x96'\xba\x1b2\xf2\xbf,\xd4\xc9\xa9\xb9GK"
+
+		self.file2 = FSCollector.DiffFile(file2)
+
+
+		test_directory = "./exposurescout/tests/test_FileSystemCollector_dir"
+		directory = FSCollector.Directory(test_directory, None)
+		directory.append_all([file1, file2])
+
+		# Hardcode metadata to make it work on every machine (depending on the machine, metadata will be different, so we do not collect them as in the module)
+		directory.mode = 16877
+		directory.inode = 968624
+		directory.uid = 1000
+		directory.gid = 1000
+		directory.size = 4096
+		directory.metadata_hash = b"\xde#\x1e\xf5\x06P\x0e\x92f\x1c/E\xef\x81\xe4`"
+
+		self.directory = FSCollector.DiffFile(directory)
+
+	@classmethod
+	def setUp(self):
+		print(f"testing new method...")
+
+	@classmethod
+	def tearDown(self):
+		print(f"test has been performed.")
+
+	@classmethod
+	def tearDownClass(self):
+		print(f"Tests ended on the Linux/Unix File System Collector.\n")
+
+	def test_to_bytes(self):
+		"""
+		[to_bytes] with files and directories.
+		"""
+		expected = b"\x20\x41./exposurescout/tests/test_FileSystemCollector_dir/test_file1.txt@\x81\xa4N\xc7\xb1#\xe8#\xe8\r\xd5oy\xa3f(\xa9\x001\xd9Z\xfbJ\xdf\xd4 \x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X"
+		result = self.file1.to_bytes()
+
+		self.assertEqual(expected, result)
+
+		expected = b"\x20\x32./exposurescout/tests/test_FileSystemCollector_dir"
+		expected += b"@A\xedN\xc7\xb0#\xe8#\xe80\x00\xde#\x1e\xf5\x06P\x0e\x92f\x1c/E\xef\x81\xe4`"
+
+		#expected += b"\x0etest_file1.txt@\x81\xa4N\xc7\xb1#\xe8#\xe8\r\xd5oy\xa3f(\xa9\x001\xd9Z\xfbJ\xdf\xd4 \x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X"
+		#expected += b"\x0etest_file2.txt@\x81\xa4N\xc7\x93#\xe8#\xe8\r\xd9y\x96'\xba\x1b2\xf2\xbf,\xd4\xc9\xa9\xb9GK\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X"
+
+		result = self.directory.to_bytes()
+
+		self.assertEqual(expected, result)
+
+	def test_from_bytes(self):
+		"""
+		[from_bytes] with files and directories.
+		"""
+		data = b"\x20\x41./exposurescout/tests/test_FileSystemCollector_dir/test_file1.txt@\x81\xa4N\xc7\xb1#\xe8#\xe8\r\xd5oy\xa3f(\xa9\x001\xd9Z\xfbJ\xdf\xd4 \x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X"
+
+		result = FSCollector.DiffFile.from_bytes(data)
+
+		expected = (self.file1, None)
+
+		self.assertEqual(expected, result)
+
+		data = b"\x20\x32./exposurescout/tests/test_FileSystemCollector_dir"
+		data += b"@A\xedN\xc7\xb0#\xe8#\xe80\x00\xde#\x1e\xf5\x06P\x0e\x92f\x1c/E\xef\x81\xe4`"
+		#data += b"\x0etest_file1.txt@\x81\xa4N\xc7\xb1#\xe8#\xe8\r\xd5oy\xa3f(\xa9\x001\xd9Z\xfbJ\xdf\xd4 \x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X"
+		#data += b"\x0etest_file2.txt@\x81\xa4N\xc7\x93#\xe8#\xe8\r\xd9y\x96'\xba\x1b2\xf2\xbf,\xd4\xc9\xa9\xb9GK\x8d\xdd\x8b\xe4\xb1y\xa5)\xaf\xa5\xf2\xff\xaeK\x98X"
+
+
+		result = FSCollector.DiffFile.from_bytes(data)
+
+		expected = (self.directory, None)
+
+		self.assertEqual(expected, result)

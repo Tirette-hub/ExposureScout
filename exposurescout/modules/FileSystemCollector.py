@@ -26,6 +26,162 @@ import stat
 from hashlib import md5
 
 
+class DiffFile(ACollectible):
+	"""
+	Datastructure used to store files in reports.
+
+	Arguments:
+		file (File): file data structure to convert.
+
+	Attributes:
+		element_name (str): name used to identify this collectible.
+
+		path (str): path to the file.
+		mode (int): matadata.st_mode.
+		inode (int): metadata.st_ino.
+		uid (int): metadata.st_uid.
+		gid (int): metadata.st_gid.
+		size (int): metadata.st_size.
+		metadata_hash (bytes): hash of the metadata.
+		content_hash (bytes): hash of the file's content.
+	"""
+
+	element_name = "File" # same as the one of File
+
+	def __init__(self, file):
+		super(DiffFile, self).__init__()
+
+		self.path = file.path
+		self.mode = file.mode
+		self.inode = file.inode
+		self.uid = file.uid
+		self.gid = file.gid
+		self.size = file.size
+		self.metadata_hash = file.metadata_hash
+		self.content_hash = file.content_hash
+
+	def __repr__(self):
+		return str(self)
+
+	def __str__(self):
+		return f"""<{self.element_name}: path = {self.path}>"""
+
+	def __eq__(self, o):
+		if type(o) != DiffFile:
+			return False
+
+		if self.path == o.path and self.mode == o.mode and self.inode == o.inode and self.uid == o.uid and self.gid == o.gid and self.size == o.size and self.metadata_hash == o.metadata_hash and self.content_hash == o.content_hash:
+			return True
+
+		return False
+
+	def to_bytes(self):
+		"""
+		Converts this DiffFile datastructure to a byte string used to store it.
+
+		Returns:
+			A bytes stream.
+		"""
+		encoded = b""
+
+		name_len = len(self.path)
+		encoded += VarInt.to_bytes(name_len)
+		encoded += self.path.encode()
+		encoded += VarInt.to_bytes(self.mode)
+		encoded += VarInt.to_bytes(self.inode)
+		encoded += VarInt.to_bytes(self.uid)
+		encoded += VarInt.to_bytes(self.gid)
+		encoded += VarInt.to_bytes(self.size)
+		encoded += self.metadata_hash
+
+		if stat.S_ISREG(self.mode):
+			encoded += self.content_hash
+		# else: pass # no need to encode the entire sub-tree
+
+		return encoded
+
+	def from_bytes(data):
+		"""
+		Convert bytes to a DiffFile datastructure.
+
+		Arguments:
+			data (bytes): a bytes stream begining with the encoded data of a DiffFile datastructure.
+
+		Returns:
+			A tupple containing: 1. the File data structure recovered from the bytes stream; 2. the rest of the unread bytes that are not part of this group data structure.
+		"""
+
+		# first bytes represents the length of the path encoded then the path
+		i = 0
+		path_len_size = VarInt.get_len(data[0:1])
+		path_len = VarInt.from_bytes(data[0:path_len_size])
+		i += path_len_size
+		path = data[i:i+path_len].decode()
+		i += path_len
+
+		# recover metadata: mode, inode, uid, gid and size
+		mode_len = VarInt.get_len(data[i:i+1])
+		mode = VarInt.from_bytes(data[i:i+mode_len])
+		i += mode_len
+
+		inode_len = VarInt.get_len(data[i:i+1])
+		inode = VarInt.from_bytes(data[i:i+inode_len])
+		i += inode_len
+
+		uid_len = VarInt.get_len(data[i:i+1])
+		uid = VarInt.from_bytes(data[i:i+uid_len])
+		i += uid_len
+
+		gid_len = VarInt.get_len(data[i:i+1])
+		gid = VarInt.from_bytes(data[i:i+gid_len])
+		i += gid_len
+
+		size_len = VarInt.get_len(data[i:i+1])
+		size = VarInt.from_bytes(data[i:i+size_len])
+		i += size_len
+
+		# recover metadata hash
+		metadata_hash = data[i:i+16]
+		i += 16
+
+		# verify metadata hash is correct
+		# hash_val = md5()
+		# hash_val.update(path.encode())
+		# hash_val.update(f"{mode}".encode())
+		# hash_val.update(f"{inode}".encode())
+		# hash_val.update(f"{uid}".encode())
+		# hash_val.update(f"{gid}".encode())
+		# hash_val.update(f"{size}".encode())
+		# metadata_hash_verif = hash_val.digest()
+
+		# if metadata_hash != metadata_hash_verif:
+		# 	raise ValueError(f"Metadata hash does not match the metadata, data might have been corrupted.")
+
+		# check the type of file beeing gathered and recover their specific data
+		if stat.S_ISDIR(mode):
+			file = Directory(path, None)
+
+		elif stat.S_ISREG(mode):
+			content_hash = data[i:i+16]
+			i += 16
+
+			file = File(path, None, content_hash)
+
+		file.mode = mode
+		file.inode = inode
+		file.uid = uid
+		file.gid = gid
+		file.size = size
+		file.metadata_hash = metadata_hash
+
+		rest = data[i:]
+
+		if rest == b"":
+			rest = None
+
+		return (DiffFile(file), rest)
+
+
 class File(ACollectible):
 	"""
 	Datastructure used to represent a Linux/Unix File.
@@ -109,6 +265,16 @@ class File(ACollectible):
 			name = os.path.split(self.path)[i]
 			if name != '':
 				return name
+
+	def get_metadata(self):
+		"""
+		Get the metadata values (except size).
+
+		Returns:
+			A tupples containing the file's mode, inode, uid and gid.
+		"""
+		# size must not be referenced since its checked by the content hash for a file and via content list for directories
+		return (self.mode, self.inode, self.uid, self.gid)
 
 	def to_bytes(self, *args):
 		"""
@@ -270,18 +436,20 @@ class File(ACollectible):
 			ValueError: No file or directory provided.
 			ValueError: Two files or directories provided but their inode do not match.
 		"""
+		# Every File or Directory object must be converted to a DiffFile object prior to be added in the report.
+
 		if a and not b:
-			element = DiffElement(run_id_a, a, DELETED)
+			element = DiffElement(run_id_a, DiffFile(a), DELETED)
 			report.add_diff_element(element, collector.name)
 
 			if stat.S_ISDIR(a.mode):
 				# the file is a directory so we need to find all its content
-				for file in b.get_content():
+				for file in a.get_content():
 					Directory.make_diff(collector, run_id_a, run_id_b, file, None, report)
 
 
 		elif b and not a:
-			element = DiffElement(run_id_b, b, DELETED)
+			element = DiffElement(run_id_b, DiffFile(b), DELETED)
 			report.add_diff_element(element, collector.name)
 
 			if stat.S_ISDIR(b.mode):
@@ -305,30 +473,30 @@ class File(ACollectible):
 							# We found two files that share the same inode, so they are the same file. It must have been modified
 							if stat.S_ISDIR(a_file.mode) and stat.S_ISDIR(a_file.mode):
 								# the files are directories
-								if a_file.get_filename() == b_file.get_filename():
+								if a_file.get_metadata() == b_file.get_metadata() and a_file.get_filename() == b_file.get_filename():
 									# it changed because its content changed, but not because the directory itself has been modified
 									# we need to find what did change here
 									Directory.make_diff(collector, run_id_a, run_id_b, a_file, b_file, report)
 
 								elif a_file.get_content() == b_file.get_content():
-									# name changed but not the content, we only need to record this change
-									element_a = DiffElement(run_id_a, a_file, MODIFIED)
-									element_b = DiffElement(run_id_b, b_file, MODIFIED)
+									# name or data in metadata changed but not the content, we only need to record this change
+									element_a = DiffElement(run_id_a, DiffFile(a_file), MODIFIED)
+									element_b = DiffElement(run_id_b, DiffFile(b_file), MODIFIED)
 									report.add_diff_element(element_a, collector.name)
 									report.add_diff_element(element_b, collector.name)
 
 								else:
 									# name changed and content as well. we need to record both
-									element_a = DiffElement(run_id_a, a_file, MODIFIED)
-									element_b = DiffElement(run_id_b, b_file, MODIFIED)
+									element_a = DiffElement(run_id_a, DiffFile(a_file), MODIFIED)
+									element_b = DiffElement(run_id_b, DiffFile(b_file), MODIFIED)
 									report.add_diff_element(element_a, collector.name)
 									report.add_diff_element(element_b, collector.name)
 									Directory.make_diff(collector, run_id_a, run_id_b, a_file, b_file, report)
 
 							else:
 								# file is a regular file or link file
-								element_a = DiffElement(run_id_a, a_file, MODIFIED)
-								element_b = DiffElement(run_id_b, b_file, MODIFIED)
+								element_a = DiffElement(run_id_a, DiffFile(a_file), MODIFIED)
+								element_b = DiffElement(run_id_b, DiffFile(b_file), MODIFIED)
 								report.add_diff_element(element_a, collector.name)
 								report.add_diff_element(element_b, collector.name)
 
@@ -339,7 +507,7 @@ class File(ACollectible):
 
 					if new_file:
 						# elements that were in a but not in b anymore were deleted between the two snapshots
-						element_a = DiffElement(run_id_a, a_file, DELETED)
+						element_a = DiffElement(run_id_a, DiffFile(a_file), DELETED)
 						report.add_diff_element(element_a, collector.name)
 
 				for b_file in unique_files_b:
@@ -348,13 +516,13 @@ class File(ACollectible):
 						Directory.make_diff(collector, run_id_a, run_id_b, None, b_file, report)
 					else:
 						# just add the new file
-						element_b = DiffElement(run_id_b, b_file, CREATED)
+						element_b = DiffElement(run_id_b, DiffFile(b_file), CREATED)
 						report.add_diff_element(element_b, collector.name)
 
 			elif stat.S_ISDIR(a.mode):
 				# b is not a directory
-				element_a = DiffElement(run_id_a, a, MODIFIED)
-				element_b = DiffElement(run_id_b, b, MODIFIED)
+				element_a = DiffElement(run_id_a, DiffFile(a), MODIFIED)
+				element_b = DiffElement(run_id_b, DiffFile(b), MODIFIED)
 				report.add_diff_element(element_a, collector.name)
 				report.add_diff_element(element_b, collector.name)
 
@@ -362,8 +530,8 @@ class File(ACollectible):
 
 			elif stat.S_ISDIR(b.mode):
 				# a is not a directory
-				element_a = DiffElement(run_id_a, a, MODIFIED)
-				element_b = DiffElement(run_id_b, b, MODIFIED)
+				element_a = DiffElement(run_id_a, DiffFile(a), MODIFIED)
+				element_b = DiffElement(run_id_b, DiffFile(b), MODIFIED)
 				report.add_diff_element(element_a, collector.name)
 				report.add_diff_element(element_b, collector.name)
 
@@ -371,8 +539,8 @@ class File(ACollectible):
 
 			else:
 				# both a and b are files
-				element_a = DiffElement(run_id_a, a, MODIFIED)
-				element_b = DiffElement(run_id_b, b, MODIFIED)
+				element_a = DiffElement(run_id_a, DiffFile(a), MODIFIED)
+				element_b = DiffElement(run_id_b, DiffFile(b), MODIFIED)
 				report.add_diff_element(element_a, collector.name)
 				report.add_diff_element(element_b, collector.name)
 
@@ -717,32 +885,32 @@ class LinFileSystemCollector(ACollector):
 						# We found two files that share the same inode, so they are the same file. It must have been modified
 						if stat.S_ISDIR(a_file.mode) and stat.S_ISDIR(b_file.mode):
 							# the files are directories
-							if a_file.get_filename() == b_file.get_filename():
+							if a_file.get_metadata() == b_file.get_metadata() and a_file.get_filename() == b_file.get_filename():
 								# it changed because its content changed, but not because the directory itself has been modified
 								# we need to find what did change here
 								File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, a_file, b_file, report)
 
 							elif a_file.get_content() == b_file.get_content():
-								# name changed but not the content, we only need to record this change
-								element_a = DiffElement(run_id_a, a_file, MODIFIED)
-								element_b = DiffElement(run_id_b, b_file, MODIFIED)
-								report.add_diff_element(element_a, collector.name)
-								report.add_diff_element(element_b, collector.name)
+								# name or another data part of metadata changed but not the content, we only need to record this change
+								element_a = DiffElement(run_id_a, DiffFile(a_file), MODIFIED)
+								element_b = DiffElement(run_id_b, DiffFile(b_file), MODIFIED)
+								report.add_diff_element(element_a, LinFileSystemCollector.name)
+								report.add_diff_element(element_b, LinFileSystemCollector.name)
 
 							else:
 								# name changed and content as well. we need to record both
-								element_a = DiffElement(run_id_a, a_file, MODIFIED)
-								element_b = DiffElement(run_id_b, b_file, MODIFIED)
-								report.add_diff_element(element_a, collector.name)
-								report.add_diff_element(element_b, collector.name)
+								element_a = DiffElement(run_id_a, DiffFile(a_file), MODIFIED)
+								element_b = DiffElement(run_id_b, DiffFile(b_file), MODIFIED)
+								report.add_diff_element(element_a, LinFileSystemCollector.name)
+								report.add_diff_element(element_b, LinFileSystemCollector.name)
 								File.make_diff(LinFileSystemCollector, run_id_a, run_id_b, a_file, b_file, report)
 
 						else:
 							# file is a regular file or link file
-							element_a = DiffElement(run_id_a, a_file, MODIFIED)
-							element_b = DiffElement(run_id_b, b_file, MODIFIED)
-							report.add_diff_element(element_a, collector.name)
-							report.add_diff_element(element_b, collector.name)
+							element_a = DiffElement(run_id_a, DiffFile(a_file), MODIFIED)
+							element_b = DiffElement(run_id_b, DiffFile(b_file), MODIFIED)
+							report.add_diff_element(element_a, LinFileSystemCollector.name)
+							report.add_diff_element(element_b, LinFileSystemCollector.name)
 
 						new_file = False
 						unique_files_b.remove(b_file)
@@ -751,17 +919,17 @@ class LinFileSystemCollector(ACollector):
 
 				if new_file:
 					# elements that were in a but not in b anymore were deleted between the two snapshots
-					element_a = DiffElement(run_id_a, a_file, DELETED)
-					report.add_diff_element(element_a, collector.name)
+					element_a = DiffElement(run_id_a, DiffFile(a_file), DELETED)
+					report.add_diff_element(element_a, LinFileSystemCollector.name)
 
 			for b_file in unique_files_b:
 				if stat.S_ISDIR(b_file.mode):
 					# the file is a directory so we need to find all the new files
-					Directory.make_diff(collector, run_id_a, run_id_b, None, b_file, report)
+					Directory.make_diff(LinFileSystemCollector, run_id_a, run_id_b, None, b_file, report)
 				else:
 					# just add the new file
-					element_b = DiffElement(run_id_b, b_file, CREATED)
-					report.add_diff_element(element_b, collector.name)
+					element_b = DiffElement(run_id_b, DiffFile(b_file), CREATED)
+					report.add_diff_element(element_b, LinFileSystemCollector.name)
 
 		else:
 			raise ValueError('At least one collector should be provided to be able to make the diff between the two.')
