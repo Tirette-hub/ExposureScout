@@ -987,9 +987,11 @@ class LinUsersCollector(ACollector):
 		users_number_len = VarInt.get_len(rest[0:1])
 		users_number = VarInt.from_bytes(rest[0:users_number_len])
 
+		rest = rest[users_number_len:]
+
 		if users_number:
 			for i in range(users_number):
-				user, rest = DiffElement.from_bytes(rest[users_number_len:], run_ids, User)
+				user, rest = DiffElement.from_bytes(rest, run_ids, User)
 				report.add_diff_element(user, LinUsersCollector.name)
 		else:
 			report.add_no_diff_element(LinUsersCollector.name, User.element_name)
@@ -998,9 +1000,11 @@ class LinUsersCollector(ACollector):
 		groups_number_len = VarInt.get_len(rest[0:1])
 		groups_number = VarInt.from_bytes(rest[0:groups_number_len])
 
+		rest = rest[groups_number_len:]
+
 		if groups_number:
-			for i in range(users_number):
-				group, rest = DiffElement.from_bytes(rest[groups_number_len:], run_ids, Group)
+			for i in range(groups_number):
+				group, rest = DiffElement.from_bytes(rest, run_ids, Group)
 				report.add_diff_element(group, LinUsersCollector.name)
 		else:
 			report.add_no_diff_element(LinUsersCollector.name, Group.element_name)
@@ -1009,9 +1013,11 @@ class LinUsersCollector(ACollector):
 		sudoers_number_len = VarInt.get_len(rest[0:1])
 		sudoers_number = VarInt.from_bytes(rest[0:sudoers_number_len])
 
+		rest = rest[sudoers_number_len:]
+
 		if sudoers_number:
-			for i in range(users_number):
-				sudoer, rest = DiffElement.from_bytes(rest[sudoers_number_len:], run_ids, Sudoer)
+			for i in range(sudoers_number):
+				sudoer, rest = DiffElement.from_bytes(rest, run_ids, Sudoer)
 				report.add_diff_element(sudoer, LinUsersCollector.name)
 		else:
 			report.add_no_diff_element(LinUsersCollector.name, Sudoer.element_name)
