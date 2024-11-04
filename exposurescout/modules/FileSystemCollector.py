@@ -449,7 +449,7 @@ class File(ACollectible):
 
 
 		elif b and not a:
-			element = DiffElement(run_id_b, DiffFile(b), DELETED)
+			element = DiffElement(run_id_b, DiffFile(b), CREATED)
 			report.add_diff_element(element, collector.name)
 
 			if stat.S_ISDIR(b.mode):

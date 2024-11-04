@@ -219,22 +219,26 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		path = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
 
 		collector_a = FSCollector.LinFileSystemCollector()
-		collector_a.set_rule(path)
-		collector_a.run()
+		
 
-
+		# hard code values so we have control over values that are tested
 		test_file1 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file1.txt")
 		metadata = os.lstat(test_file1)
 		file1 = FSCollector.File(test_file1, metadata, tools.get_file_hash(test_file1))
+		file1.inode = 968625
 		
 		test_file2 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file2.txt")
 		metadata = os.lstat(test_file2)
 		file2 = FSCollector.File(test_file2, metadata, tools.get_file_hash(test_file2))
+		file2.inode = 968595
 		
 		test_directory = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
 		metadata = os.lstat(test_directory)
 		directory = FSCollector.Directory(test_directory, metadata)
 		directory.append_all([file1, file2])
+		directory.inode = 968624
+
+		collector_a.raw_result = [directory]
 
 
 		expected = report.DiffReport(run_id_a, run_id_b)
