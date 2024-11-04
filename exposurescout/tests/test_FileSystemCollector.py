@@ -46,7 +46,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		self.file2.inode = 968595
 		self.file2.uid = 1001
 		self.file2.gid = 1001
-		self.file2.metadata_hash = b"\xd9y\x96'\xba\x1b2\xf2\xbf,\xd4\xc9\xa9\xb3GK"
+		self.file2.metadata_hash = b"\xd9y\x96'\xba\x1b2\xf2\xbf,\xd4\xc9\xa9\xb4GK"
 
 
 		test_directory = path
@@ -212,8 +212,6 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		run_id_a = "test_a"
 		run_id_b = "test_b"
 
-		path = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
-
 		collector_a = FSCollector.LinFileSystemCollector()
 
 
@@ -275,7 +273,80 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		self.assertNotEqual(collector_a, collector_b)
 		self.assertEqual(result, expected)
 
+	def test_import_diff_from_report(self):
+		"""
+		[import_diff_from_report]
+		"""
+		run_id_a = "test_a"
+		run_id_b = "test_b"
 
+		collector_a = FSCollector.LinFileSystemCollector()
+
+
+		# hard code values so we have control over values that are tested
+		test_file1 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file1.txt")
+		metadata = os.lstat(test_file1)
+		file1 = FSCollector.File(test_file1, metadata, 13, tools.get_file_hash(test_file1))
+		file1.inode = 968625
+		
+		test_file2 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file2.txt")
+		metadata = os.lstat(test_file2)
+		file2 = FSCollector.File(test_file2, metadata, 13, tools.get_file_hash(test_file2))
+		file2.inode = 968595
+		
+		test_directory = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+		metadata = os.lstat(test_directory)
+		directory = FSCollector.Directory(test_directory, metadata)
+		directory.append_all([file1, file2])
+		directory.inode = 968624
+
+		collector_a.raw_result = [directory]
+
+		expected = report.DiffReport(run_id_a, run_id_b)
+		expected.diff_elemnts = {
+			'File System Collector': {
+				'File': [
+					report.DiffElement(run_id_a, FSCollector.DiffFile(directory), report.MODIFIED),
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.directory), report.MODIFIED),
+					report.DiffElement(run_id_a, FSCollector.DiffFile(file1), report.MODIFIED),
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.file1), report.MODIFIED),
+					report.DiffElement(run_id_a, FSCollector.DiffFile(file2), report.MODIFIED),
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.file2), report.MODIFIED),
+				]
+			}
+		}
+
+		result = report.DiffReport(run_id_a, run_id_b)
+
+		data = b"\x06"
+
+		data += b"\x00"
+		data += FSCollector.DiffFile(directory).to_bytes()
+		data += b"\x02"
+
+		data += b"\x01"
+		data += FSCollector.DiffFile(self.directory).to_bytes()
+		data += b"\x02"
+
+		data += b"\x00"
+		data += FSCollector.DiffFile(file1).to_bytes()
+		data += b"\x02"
+
+		data += b"\x01"
+		data += FSCollector.DiffFile(self.file1).to_bytes()
+		data += b"\x02"
+
+		data += b"\x00"
+		data += FSCollector.DiffFile(file2).to_bytes()
+		data += b"\x02"
+
+		data += b"\x01"
+		data += FSCollector.DiffFile(self.file2).to_bytes()
+		data += b"\x02"
+
+		FSCollector.LinFileSystemCollector.import_diff_from_report(data, [run_id_a, run_id_b], result)
+
+		self.assertEqual(result, expected)
 
 
 class TestFile(unittest.TestCase):

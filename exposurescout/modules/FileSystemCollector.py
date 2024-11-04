@@ -1112,6 +1112,8 @@ class LinFileSystemCollector(ACollector):
 		else:
 			report.add_no_diff_element(LinFileSystemCollector.name, DiffFile.element_name)
 
+		return True
+
 
 	def import_diff_from_report_db(db_cursor, report_id, run_ids, report):
 		"""
