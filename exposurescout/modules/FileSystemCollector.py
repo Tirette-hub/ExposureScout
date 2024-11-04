@@ -1098,7 +1098,20 @@ class LinFileSystemCollector(ACollector):
 		Returns:
 			True if the Diff Elements associated to LinFileSystemCollector data have been successfully imported.
 		"""
-		pass
+		rest = data
+
+		file_number_len = VarInt.get_len(rest[0:1])
+		file_number = VarInt.from_bytes(rest[0:file_number_len])
+
+		rest = rest[file_number_len:]
+
+		if file_number:
+			for i in range(file_number):
+				file, rest = DiffElement.from_bytes(rest, run_ids, DiffFile)
+				report.add_diff_element(file, LinFileSystemCollector.name)
+		else:
+			report.add_no_diff_element(LinFileSystemCollector.name, DiffFile.element_name)
+
 
 	def import_diff_from_report_db(db_cursor, report_id, run_ids, report):
 		"""
@@ -1119,7 +1132,7 @@ class LinFileSystemCollector(ACollector):
 		Returns:
 			A python dict with an empty list of Directories.
 		"""
-		return {File.element_name : []}
+		return {DiffFile.element_name : []}
 
 	def create_report_tables(db_cursor):
 		"""
