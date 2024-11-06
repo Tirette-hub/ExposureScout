@@ -839,7 +839,6 @@ class LinFileSystemCollector(ACollector):
 			content = []
 
 			for inode, mode, uid, gid, size, path, metadata_hash, content_hash in files:
-				print("Receiving:", inode, mode, uid, gid, size, path, metadata_hash, content_hash)
 				if stat.S_ISDIR(mode):
 					file = Directory(path, None)
 					result = macro(db_cursor, run_id, inode)
@@ -1234,6 +1233,8 @@ class LinFileSystemCollector(ACollector):
 			request = db_cursor.execute(query, (report_id, run_id))
 			files = request.fetchall()
 
+			print(files)
+
 			if files and files != []:
 				for inode, status in files:
 					query = f"""SELECT mode, uid, gid, size, path, metadata_hash, content_hash FROM files WHERE run_id=? AND inode=?"""
@@ -1283,6 +1284,6 @@ class LinFileSystemCollector(ACollector):
 			run_id TEXT,
 			inode INTEGER,
 			status INTEGER,
-			PRIMARY KEY(report_id, run_id, uid),
+			PRIMARY KEY(report_id, run_id, inode),
 			FOREIGN KEY(run_id, inode) REFERENCES files
 			)""")

@@ -445,10 +445,83 @@ class TestLinFileSystemCollector(unittest.TestCase):
 
 
 		conn.close()
-		
+
 
 		self.assertEqual(collector_a, collector_b)
 
+	def test_import_diff_from_report_db(self):
+		"""
+		[import_diff_from_report_db]
+		"""
+		run_id_a = "test_a"
+		run_id_b = "test_b"
+		report_id = "test"
+
+		collector_a = FSCollector.LinFileSystemCollector()
+		collector_b = FSCollector.LinFileSystemCollector()
+		collector_b.raw_result = [self.directory]
+
+
+		# hard code values so we have control over values that are tested
+		test_file1 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file1.txt")
+		metadata = os.lstat(test_file1)
+		file1 = FSCollector.File(test_file1, metadata, 13, tools.get_file_hash(test_file1))
+		file1.inode = 968625
+		
+		test_file2 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file2.txt")
+		metadata = os.lstat(test_file2)
+		file2 = FSCollector.File(test_file2, metadata, 13, tools.get_file_hash(test_file2))
+		file2.inode = 968595
+		
+		test_directory = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+		metadata = os.lstat(test_directory)
+		directory = FSCollector.Directory(test_directory, metadata)
+		directory.append_all([file1, file2])
+		directory.inode = 968624
+
+		collector_a.raw_result = [directory]
+
+		expected = report.DiffReport(run_id_a, run_id_b)
+		expected.diff_elemnts = {
+			'File System Collector': {
+				'File': [
+					report.DiffElement(run_id_a, FSCollector.DiffFile(directory), report.MODIFIED),
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.directory), report.MODIFIED),
+					report.DiffElement(run_id_a, FSCollector.DiffFile(file1), report.MODIFIED),
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.file1), report.MODIFIED),
+					report.DiffElement(run_id_a, FSCollector.DiffFile(file2), report.MODIFIED),
+					report.DiffElement(run_id_b, FSCollector.DiffFile(self.file2), report.MODIFIED),
+				]
+			}
+		}
+
+		result = report.DiffReport(run_id_a, run_id_b)
+
+
+		conn = sql.connect(":memory:")
+		cursor = conn.cursor()
+
+		FSCollector.LinFileSystemCollector.create_report_tables(cursor)
+		conn.commit()
+
+		collector_a._export_sql(cursor, run_id_a)
+		collector_b._export_sql(cursor, run_id_b)
+
+		query = f"""INSERT INTO reports_files VALUES (?, ?, ?, ?)"""
+
+		cursor.execute(query, (report_id, run_id_a, directory.inode, report.MODIFIED))
+		cursor.execute(query, (report_id, run_id_b, self.directory.inode, report.MODIFIED))
+		cursor.execute(query, (report_id, run_id_a, file1.inode, report.MODIFIED))
+		cursor.execute(query, (report_id, run_id_b, self.file1.inode, report.MODIFIED))
+		cursor.execute(query, (report_id, run_id_a, file2.inode, report.MODIFIED))
+		cursor.execute(query, (report_id, run_id_b, self.file2.inode, report.MODIFIED))
+
+		FSCollector.LinFileSystemCollector.import_diff_from_report_db(cursor, report_id, [run_id_a, run_id_b], result)
+
+		conn.close()
+
+
+		self.assertEqual(result, expected)
 
 class TestFile(unittest.TestCase):
 	@classmethod
