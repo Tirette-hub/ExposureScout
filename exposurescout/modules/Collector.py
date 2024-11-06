@@ -6,7 +6,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.1.0
 """
 
 import time
@@ -140,20 +140,20 @@ class ACollector:
 		self._format()
 		return self._export()
 
-	def _export_sql(self, db, run_id):
+	def _export_sql(self, db_cursor, run_id):
 		"""
 		Private method to export the result in a db after running the module. MUST be rewritten for every new module.
 		"""
 		raise AbstractMethodException("You should not use the abstracted class method in your module for _export_sql. Please implement it properly.")
 
-	def export_db(self, db, run_id):
+	def export_db(self, db_cursor, run_id):
 		"""
 		Public method to export the result in a db after running the module. It is mainly used by the CollectorManager of the "core" python project module.
 		"""
 		if self.running:
 			raise RunningError("Module is still running, please wait until the end before trying to export the result.")
 
-		self._export_sql(db, run_id)
+		self._export_sql(db_cursor, run_id)
 
 	def import_bin(self, data):
 		"""
