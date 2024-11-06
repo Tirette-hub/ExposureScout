@@ -13,7 +13,7 @@ Version:
 #ADD YOUR OWN NEW MODULES HERE
 from .UsersCollector import LinUsersCollector, User, Group, Sudoer
 from .Collector import RunningError, FormattingError, AbstractMethodException
-from .FileSystemCollector import LinFileSystemCollector, File, Directory
+from .FileSystemCollector import LinFileSystemCollector, File, Directory, DiffFile
 
 from ..core.tools import xor_list, and_list
 
