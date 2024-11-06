@@ -290,9 +290,21 @@ class File(ACollectible):
 		return (self.mode, self.inode, self.uid, self.gid)
 
 	def is_dir(self):
+		"""
+		Check if the file is a directory.
+
+		Returns:
+			True if the file is a directory, False otherwize.
+		"""
 		return stat.S_ISDIR(self.mode)
 
 	def is_file(self):
+		"""
+		Check if the file is a regular file.
+
+		Returns:
+			True if the file is a regular file, False otherwize.
+		"""
 		return stat.S_ISREG(self.mode)
 
 	def to_bytes(self, *args):
@@ -725,15 +737,6 @@ class Directory(File):
 
 		return False
 
-	def get_content(self):
-		"""
-		Get the list of files and directories it contains.
-
-		Returns:
-			The list of files and directories it contains.
-		"""
-		return self.content
-
 
 class LinFileSystemCollector(ACollector):
 	"""
@@ -776,7 +779,7 @@ class LinFileSystemCollector(ACollector):
 		Add directory to walk.
 
 		Arguments:
-			rules (str): path to the directory to walk.
+			rule (str): path to the directory to walk.
 		"""
 		self.rules.append(rule)
 
@@ -928,6 +931,13 @@ class LinFileSystemCollector(ACollector):
 
 	def walk_through(self, path):
 		"""
+		Walk through a given path to collect all the data it contains. If the path points to a directory, it therefore also collects all the directories and files it contains.
+
+		Arguments:
+			path (str): path to walk through.
+
+		Returns:
+			The File or Directory object collected that represent the one pointed by the given path on the machine File System.
 		"""
 		# get the metadata
 		metadata = os.lstat(path)
