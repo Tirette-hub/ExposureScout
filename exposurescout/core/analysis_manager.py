@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.1.0
 """
 
 import time
@@ -122,8 +122,16 @@ class AnalysisManager:
 
 		elif method == DB:
 			if db:
+				import sqlite3 as sql
+
+				conn = sql.connect(db)
+				cursor = conn.cursor()
+
 				for collector in self.runs[run_id]:
-					collector.export_db(db, run_id)
+					collector.export_db(cursor, run_id)
+					conn.commit()
+
+				conn.close()
 			else:
 				raise ValueError(f"No database path was set. Please provide a proper path.")
 

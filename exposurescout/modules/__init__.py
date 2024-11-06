@@ -6,13 +6,14 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.1.0
 """
 
 
 #ADD YOUR OWN NEW MODULES HERE
 from .UsersCollector import LinUsersCollector, User, Group, Sudoer
 from .Collector import RunningError, FormattingError, AbstractMethodException
+from .FileSystemCollector import LinFileSystemCollector, File, Directory, DiffFile
 
 from ..core.tools import xor_list, and_list
 
@@ -98,6 +99,7 @@ class CollectorList:
 #DON'T FORGET TO ADD YOUR MODULE IN THE AVAILABLE MODULES LIST
 AVAILABLE_COLLECTORS = CollectorList([
 	LinUsersCollector,
+	LinFileSystemCollector,
 	])
 #we could set a rule here if we want to be cross platform to only set the available modules for a specific platform
 #e.g. LinUsersCollector is Linux oriented but we could create a WinUsersCollector and depending on the platform we are running on, the available module would be one or the other.
