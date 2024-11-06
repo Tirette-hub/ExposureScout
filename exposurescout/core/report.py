@@ -11,6 +11,7 @@ Version:
 """
 
 from .octets import VarInt
+from . import tools
 
 CREATED = 0
 DELETED = 1
@@ -216,7 +217,9 @@ class DiffReport:
 		if o.first_run_id != self.first_run_id and o.second_run_id != self.second_run_id:
 			return False
 
-		if o.diff_elemnts == self.diff_elemnts:
+		unique_self, unique_o = tools.xor_list(self.diff_elemnts, o.diff_elemnts)
+
+		if not unique_self and not unique_o:
 			return True
 
 		return False
