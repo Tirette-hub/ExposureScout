@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.1.0
 """
 
 
@@ -551,37 +551,34 @@ class LinUsersCollector(ACollector):
 		# store the recovered data
 		self.raw_result = [users, groups, sudoers, passwd_hash, group_hash]
 
-	def _export_sql(self, db, run_id):
+	def _export_sql(self, db_cursor, run_id):
 		"""
 		Private method to export the result in a db after running the module.
 		"""
-		conn = sql.connect(db)
-		cursor = conn.cursor()
-
 		# creates the tables if they do not already exist
-		cursor.execute("""CREATE TABLE IF NOT EXISTS snapshots(
+		db_cursor.execute("""CREATE TABLE IF NOT EXISTS snapshots(
 			run_id TEXT,
 			collector_type BLOB,
 			PRIMARY KEY(run_id, collector_type)
 			)""") # collector type is prefered as "collector_type" value compared to collector name because encoding is lighter with a BLOB of bytes than with a TEXT value
-		cursor.execute("""CREATE TABLE IF NOT EXISTS user_collector(
+		db_cursor.execute("""CREATE TABLE IF NOT EXISTS user_collector(
 			run_id TEXT PRIMARY KEY,
 			passwd_md5 BLOB,
 			group_md5 BLOB
 			)""")
-		cursor.execute("""CREATE TABLE IF NOT EXISTS users(
+		db_cursor.execute("""CREATE TABLE IF NOT EXISTS users(
 			run_id TEXT,
 			uid INTEGER,
 			name TEXT,
 			PRIMARY KEY(run_id, uid)
 			)""")
-		cursor.execute("""CREATE TABLE IF NOT EXISTS groups(
+		db_cursor.execute("""CREATE TABLE IF NOT EXISTS groups(
 			run_id TEXT,
 			gid INTEGER,
 			name TEXT,
 			PRIMARY KEY(run_id, gid)
 			)""")
-		cursor.execute("""CREATE TABLE IF NOT EXISTS groups_list(
+		db_cursor.execute("""CREATE TABLE IF NOT EXISTS groups_list(
 			run_id INTEGER,
 			gid TEXT,
 			uid INTEGER,
@@ -589,44 +586,38 @@ class LinUsersCollector(ACollector):
 			FOREIGN KEY(run_id, gid) REFERENCES groups(run_id, gid),
 			FOREIGN KEY(run_id, uid) REFERENCES users(run_id, uid)
 			)""")
-		cursor.execute("""CREATE TABLE IF NOT EXISTS sudoers(
+		db_cursor.execute("""CREATE TABLE IF NOT EXISTS sudoers(
 			run_id TEXT,
 			uid INTEGER,
 			PRIMARY KEY(run_id, uid),
 			FOREIGN KEY(run_id, uid) REFERENCES users(run_id, uid)
 			)""")
 
-		conn.commit()
-
 		# Add the collector type in the list of collectors that were run during the snapshot
 		query = f"""INSERT INTO snapshots VALUES (?, ?)"""
-		cursor.execute(query, (run_id, self.snapshot_elemnt_id))
+		db_cursor.execute(query, (run_id, self.snapshot_elemnt_id))
 
 		# Add the user collector general data
 		query = f"""INSERT INTO user_collector VALUES (?, ?, ?)"""
-		cursor.execute(query, (run_id, self.raw_result[3], self.raw_result[4]))
+		db_cursor.execute(query, (run_id, self.raw_result[3], self.raw_result[4]))
 
 		# Add the users and their groups list
 		for user in self.raw_result[0]:
 			for gid in user.groups:
 				query = f"""INSERT INTO groups_list VALUES (?, ?, ?)"""
-				cursor.execute(query, (run_id, gid, user.uid))
+				db_cursor.execute(query, (run_id, gid, user.uid))
 			query = f"""INSERT INTO users VALUES (?, ?, ?)"""
-			cursor.execute(query, (run_id, user.uid, user.name))
+			db_cursor.execute(query, (run_id, user.uid, user.name))
 
 		# Add the groups to the db
 		for group in self.raw_result[1]:
 			query = f"""INSERT INTO groups VALUES (?, ?, ?)"""
-			cursor.execute(query, (run_id, group.gid, group.name))
+			db_cursor.execute(query, (run_id, group.gid, group.name))
 
 		# Add the sudoers
 		for sudoer in self.raw_result[2]:
 			query = f"""INSERT INTO sudoers VALUES (?, ?)"""
-			cursor.execute(query, (run_id, sudoer.uid))
-
-		# commit modifications and close the db
-		conn.commit()
-		conn.close()
+			db_cursor.execute(query, (run_id, sudoer.uid))
 
 	def _format(self):
 		"""
