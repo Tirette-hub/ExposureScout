@@ -181,6 +181,19 @@ class DiffFile(ACollectible):
 
 		return (DiffFile(file), rest)
 
+	def export_report_db(self, report_id, run_id, status, db_cursor):
+		"""
+		Export a DiffFile data structure that is part of a diff report into the specified database.
+
+		Arguments:
+			report_id (str): identifer of the report the element is linked to.
+			run_id (str): identifier of the snapshot run the element comes from.
+			status (int): value of the element's status in the diff report (created, deleted, modified, ...).
+			db_cursor (Cursor): sqlite3 cursor that points to the database.
+		"""
+		query = f"""INSERT INTO report_files VALUES (?, ?, ?, ?)"""
+		db_cursor.execute(query, (report_id, run_id, self.inode, status))
+
 
 class File(ACollectible):
 	"""
@@ -275,6 +288,12 @@ class File(ACollectible):
 		"""
 		# size must not be referenced since its checked by the content hash for a file and via content list for directories
 		return (self.mode, self.inode, self.uid, self.gid)
+
+	def is_dir(self):
+		return stat.S_ISDIR(self.mode)
+
+	def is_file(self):
+		return stat.S_ISREG(self.mode)
 
 	def to_bytes(self, *args):
 		"""
@@ -417,8 +436,17 @@ class File(ACollectible):
 
 	def export_report_db(self, report_id, run_id, status, db_cursor):
 		"""
+		Export a File data structure into the specified database for a report.
+		Note: This data structure is not directly exported but it is first converted to a DiffFile
+
+		Arguments:
+			report_id (str): identifer of the report the element is linked to.
+			run_id (str): identifier of the snapshot run the element comes from.
+			status (int): value of the element's status in the diff report (created, deleted, modified, ...).
+			db_cursor (Cursor): sqlite3 cursor that points to the database.
 		"""
-		pass
+		elmnt = DiffFile(self)
+		elmnt.export_report_db(report_id, run_id, status, db_cursor)
 
 	def make_diff(collector, run_id_a, run_id_b, a, b, report):
 		"""
@@ -617,7 +645,6 @@ class Directory(File):
 		hash_val.update(f"{self.size}".encode())
 		self.metadata_hash = hash_val.digest()
 
-
 	def append_all(self, file_list):
 		"""
 		Append a list of files and directories to this directory.
@@ -797,14 +824,92 @@ class LinFileSystemCollector(ACollector):
 
 	def import_db(self, db_cursor, run_id):
 		"""
-		"""
-		pass
+		Import method to recover data of a previous run stored in DB. Those data can then be previewed.
+		Note: must already been connected to the database.
 
-	def _export_sql(self, db, run_id):
+		Arguments:
+			db_cursor (Cursor): pointer to the database.
+			run_id (str): id used to store the collected data in the db of a specific run.
+		"""
+		def macro(db_cursor, run_id, parent):
+			query = f"""SELECT inode, mode, uid, gid, size, path, metadata_hash, content_hash FROM files WHERE run_id=? AND parent IS ?"""
+			request = db_cursor.execute(query, (run_id, parent))
+			files = request.fetchall()
+
+			content = []
+
+			for inode, mode, uid, gid, size, path, metadata_hash, content_hash in files:
+				print("Receiving:", inode, mode, uid, gid, size, path, metadata_hash, content_hash)
+				if stat.S_ISDIR(mode):
+					file = Directory(path, None)
+					result = macro(db_cursor, run_id, inode)
+					file.content = result
+				else:
+					file = File(path, None, size, content_hash)
+
+				file.inode = inode
+				file.mode = mode
+				file.uid = uid
+				file.gid = gid
+				file.size = size
+				file.metadata_hash = metadata_hash
+
+				content.append(file)
+
+			return content
+
+		self.raw_result = macro(db_cursor, run_id, None)
+
+	def _export_sql(self, db_cursor, run_id):
 		"""
 		Private method to export the result in a db after running the module.
 		"""
-		pass
+		# creates the tables if they do not already exist
+		db_cursor.execute("""CREATE TABLE IF NOT EXISTS snapshots(
+			run_id TEXT,
+			collector_type BLOB,
+			PRIMARY KEY(run_id, collector_type)
+			)""") # collector type is prefered as "collector_type" value compared to collector name because encoding is lighter with a BLOB of bytes than with a TEXT value
+		db_cursor.execute("""CREATE TABLE IF NOT EXISTS files(
+			run_id TEXT,
+			inode INTEGER,
+			mode INTEGER,
+			uid INTEGER,
+			gid INTEGER,
+			size INTEGER,
+			path TEXT,
+			parent INTEGER,
+			metadata_hash BLOB,
+			content_hash BLOB,
+			PRIMARY KEY(run_id, inode),
+			FOREIGN KEY(run_id, parent) REFERENCES files(run_id, inode)
+			)""")
+
+		# Add the collector type in the list of collectors that were run during the snapshot
+		query = f"""INSERT INTO snapshots VALUES (?, ?)"""
+		db_cursor.execute(query, (run_id, self.snapshot_elemnt_id))
+
+		# Add the files
+		query = f"""INSERT INTO files VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
+		for file in self.raw_result:
+			directories = []
+			if file.is_dir():
+				directories.append(file)
+
+				db_cursor.execute(query, (run_id, file.inode, file.mode, file.uid, file.gid, file.size, file.path, None, file.metadata_hash, None))
+
+				# go deep in the tree
+				while len(directories) > 0:
+					directory = directories.pop(0)
+					for f in directory.get_content():
+						if f.is_dir():
+							directories.append(f)
+							db_cursor.execute(query, (run_id, f.inode, f.mode, f.uid, f.gid, f.size, f.path, directory.inode, f.metadata_hash, None))
+						else:
+							db_cursor.execute(query, (run_id, f.inode, f.mode, f.uid, f.gid, f.size, f.path, directory.inode, f.metadata_hash, f.content_hash))
+			else:
+				db_cursor.execute(query, (run_id, file.inode, file.mode, file.uid, file.gid, file.size, file.path, None, file.metadata_hash, file.content_hash))
 
 	def _format(self):
 		"""
@@ -1085,7 +1190,6 @@ class LinFileSystemCollector(ACollector):
 		else:
 			raise ValueError('At least one collector should be provided to be able to make the diff between the two.')
 
-
 	def import_diff_from_report(data, run_ids, report):
 		"""
 		Extract LinFileSystemCollector's diff elements from a report file.
@@ -1114,7 +1218,6 @@ class LinFileSystemCollector(ACollector):
 
 		return True
 
-
 	def import_diff_from_report_db(db_cursor, report_id, run_ids, report):
 		"""
 		Extract LinFileSystemCollector's diff elements from a database.
@@ -1125,7 +1228,38 @@ class LinFileSystemCollector(ACollector):
 			run_ids (list[str]): the ordered list of the snapshot ids from which come the report elements.
 			report (DiffReport): datastructure in which to store the recovered data.
 		"""
-		pass
+		for run_id in run_ids:
+			# search for every DiffFile associated to this report and run
+			query = f"""SELECT inode, status FROM reports_files WHERE report_id=? AND run_id=?"""
+			request = db_cursor.execute(query, (report_id, run_id))
+			files = request.fetchall()
+
+			if files and files != []:
+				for inode, status in files:
+					query = f"""SELECT mode, uid, gid, size, path, metadata_hash, content_hash FROM files WHERE run_id=? AND inode=?"""
+					request = db_cursor.execute(query, (run_id, inode))
+					data = request.fetchall()
+					for mode, uid, gid, size, path, metadata_hash, content_hash, *_ in data:
+						if stat.S_ISDIR(mode):
+							file = Directory(path, None)
+							file.size = size
+						else:
+							file = File(path, None, size, content_hash)
+
+						file.inode = inode
+						file.mode = mode
+						file.uid = uid
+						file.gid = gid
+						file.metadata_hash = metadata_hash
+
+						report.add_diff_element(DiffElement(run_id, DiffFile(file), status), LinFileSystemCollector.name)
+
+			else:
+				try:
+					report.add_no_diff_element(LinFileSystemCollector.name, DiffFile.element_name)
+				except AlreadyExistsException as e:
+					# we are reading the second run_id and the first one had values to add where the send had none. Just discard the error, it is controlled.
+					pass
 
 	def get_report_tree_structure():
 		"""
@@ -1144,4 +1278,11 @@ class LinFileSystemCollector(ACollector):
 		Arguments:
 			db_cursor (Cursor): sqlite3 cursor pointing to the database in which the tables must be created.
 		"""
-		pass
+		db_cursor.execute("""CREATE TABLE IF NOT EXISTS reports_files(
+			report_id TEXT,
+			run_id TEXT,
+			inode INTEGER,
+			status INTEGER,
+			PRIMARY KEY(report_id, run_id, uid),
+			FOREIGN KEY(run_id, inode) REFERENCES files
+			)""")

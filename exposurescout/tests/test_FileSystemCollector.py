@@ -17,6 +17,7 @@ from ..core.octets import VarInt
 from ..core import tools, report
 import unittest
 import os
+import sqlite3 as sql
 
 unittest.util._MAX_LENGTH=2000
 
@@ -347,6 +348,106 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		FSCollector.LinFileSystemCollector.import_diff_from_report(data, [run_id_a, run_id_b], result)
 
 		self.assertEqual(result, expected)
+
+	def test__export_sql(self):
+		"""
+		[_export_sql]
+		"""
+		run_id = "test_a"
+
+		path = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+
+		collector = FSCollector.LinFileSystemCollector()
+
+		# hard code values so we have control over values that are tested
+		test_file1 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file1.txt")
+		metadata = os.lstat(test_file1)
+		file1 = FSCollector.File(test_file1, metadata, 13, tools.get_file_hash(test_file1))
+		file1.inode = 968625
+		
+		test_file2 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file2.txt")
+		metadata = os.lstat(test_file2)
+		file2 = FSCollector.File(test_file2, metadata, 13, tools.get_file_hash(test_file2))
+		file2.inode = 968595
+		
+		test_directory = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+		metadata = os.lstat(test_directory)
+		directory = FSCollector.Directory(test_directory, metadata)
+		directory.append_all([file1, file2])
+		directory.inode = 968624
+
+		collector.raw_result = [directory]
+
+
+		conn = sql.connect(":memory:")
+		cursor = conn.cursor()
+
+		collector._export_sql(cursor, run_id)
+		conn.commit()
+
+		query = f"""SELECT * FROM files"""
+		request = cursor.execute(query)
+		result = request.fetchall()
+
+		conn.close()
+
+		expected = [
+			(run_id, directory.inode, directory.mode, directory.uid, directory.gid, directory.size, directory.path, None, directory.metadata_hash, None),
+			(run_id, file1.inode, file1.mode, file1.uid, file1.gid, file1.size, file1.path, directory.inode, file1.metadata_hash, file1.content_hash),
+			(run_id, file2.inode, file2.mode, file2.uid, file2.gid, file2.size, file2.path, directory.inode, file2.metadata_hash, file2.content_hash),
+		]
+
+		self.assertEqual(result, expected)
+
+	def test_import_db(self):
+		"""
+		[import_db]
+		"""
+		run_id = "test_a"
+
+		path = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+
+		collector_a = FSCollector.LinFileSystemCollector()
+		collector_b = FSCollector.LinFileSystemCollector()
+
+		# hard code values so we have control over values that are tested
+		test_file1 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file1.txt")
+		metadata = os.lstat(test_file1)
+		file1 = FSCollector.File(test_file1, metadata, 13, tools.get_file_hash(test_file1))
+		file1.inode = 968625
+		
+		test_file2 = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir/test_file2.txt")
+		metadata = os.lstat(test_file2)
+		file2 = FSCollector.File(test_file2, metadata, 13, tools.get_file_hash(test_file2))
+		file2.inode = 968595
+		
+		test_directory = os.path.join(os.path.dirname(__file__), "test_FileSystemCollector_dir")
+		metadata = os.lstat(test_directory)
+		directory = FSCollector.Directory(test_directory, metadata)
+		directory.append_all([file1, file2])
+		directory.inode = 968624
+
+		collector_a.raw_result = [directory]
+
+
+		conn = sql.connect(":memory:")
+		cursor = conn.cursor()
+
+		collector_a._export_sql(cursor, run_id)
+		conn.commit()
+
+		query = f"""SELECT * FROM files"""
+		request = cursor.execute(query)
+		result = request.fetchall()
+
+
+		collector_b.import_db(cursor, run_id)
+
+
+		conn.close()
+		
+
+		self.assertEqual(collector_a, collector_b)
 
 
 class TestFile(unittest.TestCase):
