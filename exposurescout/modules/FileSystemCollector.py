@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.1.0
+0.1.3
 """
 
 
@@ -747,7 +747,7 @@ class LinFileSystemCollector(ACollector):
 		Inherits from ACollector
 	"""
 
-	snapshot_elemnt_id = "\x01"
+	snapshot_elemnt_id = b"\x01"
 	name = "File System Collector"
 	description = """
 			For Linux/Unix platforms only.
@@ -762,7 +762,7 @@ class LinFileSystemCollector(ACollector):
 		if type(o) != LinFileSystemCollector:
 			return False
 
-		if self.raw_result:
+		if self.raw_result and o.raw_result:
 			if len(self.raw_result) != len(o.raw_result):
 				return False
 		else:
