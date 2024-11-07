@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.1.0
+0.1.4
 """
 
 
@@ -390,7 +390,7 @@ class LinUsersCollector(ACollector):
 		if not self.raw_result:
 			return None
 
-		return self.raw_result[0]
+		return self.raw_result[User.element_name]
 
 	def get_groups(self):
 		"""
@@ -402,7 +402,7 @@ class LinUsersCollector(ACollector):
 		if not self.raw_result:
 			return None
 
-		return self.raw_result[1]
+		return self.raw_result[Group.element_name]
 
 	def get_sudoers(self):
 		"""
@@ -414,7 +414,7 @@ class LinUsersCollector(ACollector):
 		if not self.raw_result:
 			return None
 
-		return self.raw_result[2]
+		return self.raw_result[Sudoer.element_name]
 
 	def get_hashes(self):
 		"""
@@ -426,7 +426,7 @@ class LinUsersCollector(ACollector):
 		if not self.raw_result:
 			return None
 
-		return (self.raw_result[3], self.raw_result[4])
+		return (self.raw_result["passwd_hash"], self.raw_result["group_hash"])
 
 	def import_bin(self, data):
 		"""
@@ -485,7 +485,7 @@ class LinUsersCollector(ACollector):
 		group_hash = rest[16:32]
 
 		#store the recovered data
-		self.raw_result = [users, groups, sudoers, passwd_hash, group_hash]
+		self.raw_result = {User.element_name:users, Group.element_name:groups, Sudoer.element_name:sudoers, "passwd_hash":passwd_hash, "group_hash":group_hash}
 
 		#return the rest of unread bytes
 		rest = rest[32:]
@@ -549,7 +549,7 @@ class LinUsersCollector(ACollector):
 			sudoers.append(Sudoer(uid))	
 
 		# store the recovered data
-		self.raw_result = [users, groups, sudoers, passwd_hash, group_hash]
+		self.raw_result = {User.element_name:users, Group.element_name:groups, Sudoer.element_name:sudoers, "passwd_hash":passwd_hash, "group_hash":group_hash}
 
 	def _export_sql(self, db_cursor, run_id):
 		"""
@@ -599,10 +599,10 @@ class LinUsersCollector(ACollector):
 
 		# Add the user collector general data
 		query = f"""INSERT INTO user_collector VALUES (?, ?, ?)"""
-		db_cursor.execute(query, (run_id, self.raw_result[3], self.raw_result[4]))
+		db_cursor.execute(query, (run_id, self.raw_result["passwd_hash"], self.raw_result["group_hash"]))
 
 		# Add the users and their groups list
-		for user in self.raw_result[0]:
+		for user in self.raw_result[User.element_name]:
 			for gid in user.groups:
 				query = f"""INSERT INTO groups_list VALUES (?, ?, ?)"""
 				db_cursor.execute(query, (run_id, gid, user.uid))
@@ -610,12 +610,12 @@ class LinUsersCollector(ACollector):
 			db_cursor.execute(query, (run_id, user.uid, user.name))
 
 		# Add the groups to the db
-		for group in self.raw_result[1]:
+		for group in self.raw_result[Group.element_name]:
 			query = f"""INSERT INTO groups VALUES (?, ?, ?)"""
 			db_cursor.execute(query, (run_id, group.gid, group.name))
 
 		# Add the sudoers
-		for sudoer in self.raw_result[2]:
+		for sudoer in self.raw_result[Sudoer.element_name]:
 			query = f"""INSERT INTO sudoers VALUES (?, ?)"""
 			db_cursor.execute(query, (run_id, sudoer.uid))
 
@@ -626,28 +626,28 @@ class LinUsersCollector(ACollector):
 		encoded_data = b""
 
 		# for each user, encode it
-		user_number = len(self.raw_result[0])
+		user_number = len(self.raw_result[User.element_name])
 		encoded_data += VarInt.to_bytes(user_number)
-		for user in self.raw_result[0]:
+		for user in self.raw_result[User.element_name]:
 			encoded_data += user.to_bytes()
 
 		# for each group, encode it
-		group_number = len(self.raw_result[1])
+		group_number = len(self.raw_result[Group.element_name])
 		encoded_data += VarInt.to_bytes(group_number)
-		for group in self.raw_result[1]:
+		for group in self.raw_result[Group.element_name]:
 			encoded_data += group.to_bytes()
 
 		# for each sudoer, encode it
-		sudoers_number = len(self.raw_result[2])
+		sudoers_number = len(self.raw_result[Sudoer.element_name])
 		encoded_data += VarInt.to_bytes(sudoers_number)
-		for sudoer in self.raw_result[2]:
+		for sudoer in self.raw_result[Sudoer.element_name]:
 			encoded_data += sudoer.to_bytes()
 
 		# encode the passwd file md5 hash
-		encoded_data += self.raw_result[3]
+		encoded_data += self.raw_result["passwd_hash"]
 
 		# encode the group file md5 hash
-		encoded_data += self.raw_result[4]
+		encoded_data += self.raw_result["group_hash"]
 
 		encoded_data_len = len(encoded_data)
 
@@ -670,7 +670,7 @@ class LinUsersCollector(ACollector):
 				user = User(uid, uname, groups)
 				raw_data.append(user)
 
-			self.raw_result[0] = raw_data
+			self.raw_result[User.element_name] = raw_data
 		except PermissionError:
 			print(f"Cannot execute {bash_file}. Please check the permissions.")
 
@@ -691,7 +691,7 @@ class LinUsersCollector(ACollector):
 				group = Group(gid, gname)
 				raw_data.append(group)
 
-			self.raw_result[1] = raw_data
+			self.raw_result[Group.element_name] = raw_data
 		except PermissionError:
 			print(f"Cannot execute {bash_file}. Please check the permissions.")
 
@@ -705,7 +705,7 @@ class LinUsersCollector(ACollector):
 			output = command.stdout.decode()
 			raw_data = list(Sudoer(int(uid)) for uid in output.split("\n") if uid != "")
 
-			self.raw_result[2] = raw_data
+			self.raw_result[Sudoer.element_name] = raw_data
 		except PermissionError:
 			print(f"Cannot execute {bash_file}. Please check the permissions.")
 
@@ -717,7 +717,7 @@ class LinUsersCollector(ACollector):
 		try:
 			hash_value = get_file_hash(passwd_file)
 
-			self.raw_result[3] = hash_value
+			self.raw_result["passwd_hash"] = hash_value
 		except PermissionError:
 			print(f"Cannot read {passwd_file}. Please check the permissions.")
 
@@ -729,15 +729,18 @@ class LinUsersCollector(ACollector):
 		try:
 			hash_value = get_file_hash(group_file)
 
-			self.raw_result[4] = hash_value
+			self.raw_result["group_hash"] = hash_value
 		except PermissionError:
 			print(f"Cannot read {group_file}. Please check the permissions.")
 
 	def _run(self):
+
+
+
 		"""
 		Private method collecting the raw data.
 		"""
-		self.raw_result = [None, None, None, None, None]
+		self.raw_result = {User.element_name:None, Group.element_name:None, Sudoer.element_name:None, "passwd_hash":None, "group_hash":None}
 
 		t_u = threading.Thread(target=self.collect_users, args=())
 		t_g = threading.Thread(target=self.collect_groups, args=())

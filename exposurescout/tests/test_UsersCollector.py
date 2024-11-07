@@ -8,7 +8,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.1.4
 """
 
 from .. import modules
@@ -104,7 +104,7 @@ class TestLinUsersCollector(unittest.TestCase):
 		sudoers = [UsersCollector.Sudoer(1000)]
 		md5 = tools.get_file_hash("./exposurescout/tests/hash_test_file.txt")
 
-		collector.raw_result = [users, groups, sudoers, md5, md5]
+		collector.raw_result = {UsersCollector.User.element_name:users, UsersCollector.Group.element_name:groups, UsersCollector.Sudoer.element_name:sudoers, "passwd_hash":md5, "group_hash":md5}
 
 		expected = b"\x00\x20\x64\x02\x23\xe8\x04user\x05\x23\xe8\x18\x19\x1b\x1d\x00\x04root\x01\x00\x06\x23\xe8\x04user\x00\x04root\x18\x05cdrom\x19\x06floppy\x1b\x04sudo\x1d\x05audio\x01\x23\xe8\x8d\xdd\x8b\xe4\xb1\x79\xa5\x29\xaf\xa5\xf2\xff\xae\x4b\x98\x58\x8d\xdd\x8b\xe4\xb1\x79\xa5\x29\xaf\xa5\xf2\xff\xae\x4b\x98\x58"
 
