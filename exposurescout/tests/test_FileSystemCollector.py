@@ -8,7 +8,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.1.0
+0.1.4
 """
 
 from .. import modules
@@ -202,7 +202,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		directory.size = 4096
 		directory.metadata_hash = b"\xde#\x1e\xf5\x06P\x0e\x92f\x1c/E\xef\x81\xe4`"
 
-		expected = [directory]
+		expected = {FSCollector.File.element_name:[directory]}
 
 		self.assertEqual(result, expected)
 
@@ -233,7 +233,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		directory.append_all([file1, file2])
 		directory.inode = 968624
 
-		collector_a.raw_result = [directory]
+		collector_a.raw_result = {FSCollector.File.element_name:[directory]}
 
 
 		expected = report.DiffReport(run_id_a, run_id_b)
@@ -253,7 +253,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		self.assertEqual(result, expected)
 
 		collector_b = FSCollector.LinFileSystemCollector()
-		collector_b.raw_result = [self.directory]
+		collector_b.raw_result = {FSCollector.File.element_name:[self.directory]}
 
 		expected.diff_elemnts = {
 			'File System Collector': {
@@ -301,7 +301,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		directory.append_all([file1, file2])
 		directory.inode = 968624
 
-		collector_a.raw_result = [directory]
+		collector_a.raw_result = {FSCollector.File.element_name:[directory]}
 
 		expected = report.DiffReport(run_id_a, run_id_b)
 		expected.diff_elemnts = {
@@ -376,7 +376,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		directory.append_all([file1, file2])
 		directory.inode = 968624
 
-		collector.raw_result = [directory]
+		collector.raw_result = {FSCollector.File.element_name:[directory]}
 
 
 		conn = sql.connect(":memory:")
@@ -427,7 +427,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		directory.append_all([file1, file2])
 		directory.inode = 968624
 
-		collector_a.raw_result = [directory]
+		collector_a.raw_result = {FSCollector.File.element_name:[directory]}
 
 
 		conn = sql.connect(":memory:")
@@ -459,7 +459,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 
 		collector_a = FSCollector.LinFileSystemCollector()
 		collector_b = FSCollector.LinFileSystemCollector()
-		collector_b.raw_result = [self.directory]
+		collector_b.raw_result = {FSCollector.File.element_name:[self.directory]}
 
 
 		# hard code values so we have control over values that are tested
@@ -479,7 +479,7 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		directory.append_all([file1, file2])
 		directory.inode = 968624
 
-		collector_a.raw_result = [directory]
+		collector_a.raw_result = {FSCollector.File.element_name:[directory]}
 
 		expected = report.DiffReport(run_id_a, run_id_b)
 		expected.diff_elemnts = {

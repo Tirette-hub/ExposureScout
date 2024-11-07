@@ -8,7 +8,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.1.4
 """
 
 from ..modules import LinUsersCollector, User, Group, Sudoer
@@ -118,8 +118,8 @@ class TestDiffReport(unittest.TestCase):
 		sudoers = [Sudoer(1000)]
 		md5 = tools.get_file_hash("./exposurescout/tests/hash_test_file.txt")
 
-		uc_a.raw_result = [users.copy(), groups.copy(), sudoers.copy(), md5, md5]
-		uc_b.raw_result = [users.copy(), groups.copy(), sudoers.copy(), md5, md5]
+		uc_a.raw_result = {User.element_name:users.copy(), Group.element_name:groups.copy(), Sudoer.element_name:sudoers.copy(), "passwd_hash":md5, "group_hash":md5}
+		uc_b.raw_result = {User.element_name:users.copy(), Group.element_name:groups.copy(), Sudoer.element_name:sudoers.copy(), "passwd_hash":md5, "group_hash":md5}
 
 		result = DiffReport(run_id_a, run_id_b)
 
@@ -134,9 +134,9 @@ class TestDiffReport(unittest.TestCase):
 		new_group = Group(1001, "test")
 		new_sudoer = Sudoer(1001)
 
-		uc_b.raw_result[0].append(new_user)
-		uc_b.raw_result[1].append(new_group)
-		uc_b.raw_result[2].append(new_sudoer)
+		uc_b.raw_result[User.element_name].append(new_user)
+		uc_b.raw_result[Group.element_name].append(new_group)
+		uc_b.raw_result[Sudoer.element_name].append(new_sudoer)
 
 		LinUsersCollector.make_diff(run_id_a, run_id_b, uc_a, uc_b, result)
 
@@ -160,17 +160,17 @@ class TestDiffReport(unittest.TestCase):
 
 		result = DiffReport(run_id_a, run_id_b)
 
-		uc_a.raw_result = [[User(1000, "user", [1000,24,25,27,29])], groups.copy(), sudoers.copy(), md5, md5]
-		uc_b.raw_result = [[User(1000, "user", [1000,24,25,27,29])], groups.copy(), sudoers.copy(), md5, md5]
+		uc_a.raw_result = {User.element_name:[User(1000, "user", [1000,24,25,27,29])], Group.element_name:groups.copy(), Sudoer.element_name:sudoers.copy(), "passwd_hash":md5, "group_hash":md5}
+		uc_b.raw_result = {User.element_name:[User(1000, "user", [1000,24,25,27,29])], Group.element_name:groups.copy(), Sudoer.element_name:sudoers.copy(), "passwd_hash":md5, "group_hash":md5}
 
 		new_user = User(1001, "test", [1001])
 		new_group = Group(1001, "test")
 		new_sudoer = Sudoer(1001)
 
-		uc_a.raw_result[0].append(new_user)
-		uc_a.raw_result[1].append(new_group)
-		uc_a.raw_result[2].append(new_sudoer)
-		uc_b.raw_result[0][0].groups.append(1001)
+		uc_a.raw_result[User.element_name].append(new_user)
+		uc_a.raw_result[Group.element_name].append(new_group)
+		uc_a.raw_result[Sudoer.element_name].append(new_sudoer)
+		uc_b.raw_result[User.element_name][0].groups.append(1001)
 
 		LinUsersCollector.make_diff(run_id_a, run_id_b, uc_a, uc_b, result)
 
@@ -179,7 +179,7 @@ class TestDiffReport(unittest.TestCase):
 			LinUsersCollector.name : {
 				User.element_name:[
 					DiffElement(run_id_a, users[0], MODIFIED),
-					DiffElement(run_id_b, uc_b.raw_result[0][0], MODIFIED),
+					DiffElement(run_id_b, uc_b.raw_result[User.element_name][0], MODIFIED),
 					DiffElement(run_id_a, new_user, DELETED),
 				],
 				Group.element_name: [
