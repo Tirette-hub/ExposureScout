@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.1.0
+0.1.3
 """
 
 
@@ -747,7 +747,7 @@ class LinFileSystemCollector(ACollector):
 		Inherits from ACollector
 	"""
 
-	snapshot_elemnt_id = "\x01"
+	snapshot_elemnt_id = b"\x01"
 	name = "File System Collector"
 	description = """
 			For Linux/Unix platforms only.
@@ -762,14 +762,14 @@ class LinFileSystemCollector(ACollector):
 		if type(o) != LinFileSystemCollector:
 			return False
 
-		if self.raw_result:
-			if len(self.raw_result) != len(o.raw_result):
+		if self.raw_result and o.raw_result:
+			if len(self.raw_result[File.element_name]) != len(o.raw_result[File.element_name]):
 				return False
 		else:
 			return False
 
-		for d in self.raw_result:
-			if d not in o.raw_result:
+		for d in self.raw_result[File.element_name]:
+			if d not in o.raw_result[File.element_name]:
 				return False
 
 		return True
@@ -799,7 +799,7 @@ class LinFileSystemCollector(ACollector):
 		Returns:
 			A list of files or directories.
 		"""
-		return self.raw_result
+		return self.raw_result[File.element_name]
 
 	def import_bin(self, data):
 		"""
@@ -823,7 +823,7 @@ class LinFileSystemCollector(ACollector):
 			file, rest = File.from_bytes(rest)
 			files.append(file)
 
-		self.raw_result = files
+		self.raw_result = {File.element_name:files}
 
 	def import_db(self, db_cursor, run_id):
 		"""
@@ -860,7 +860,7 @@ class LinFileSystemCollector(ACollector):
 
 			return content
 
-		self.raw_result = macro(db_cursor, run_id, None)
+		self.raw_result = {File.element_name:macro(db_cursor, run_id, None)}
 
 	def _export_sql(self, db_cursor, run_id):
 		"""
@@ -894,7 +894,7 @@ class LinFileSystemCollector(ACollector):
 		# Add the files
 		query = f"""INSERT INTO files VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
-		for file in self.raw_result:
+		for file in self.raw_result[File.element_name]:
 			directories = []
 			if file.is_dir():
 				directories.append(file)
@@ -920,11 +920,11 @@ class LinFileSystemCollector(ACollector):
 		encoded_data = b""
 
 		# store the number of files/directories collected
-		file_number = len(self.raw_result)
+		file_number = len(self.raw_result[File.element_name])
 		encoded_data += VarInt.to_bytes(file_number)
 
 		# for every file collected, encode it
-		for file in self.raw_result:
+		for file in self.raw_result[File.element_name]:
 			encoded_data += file.to_bytes()
 
 		self.result = encoded_data
@@ -998,9 +998,9 @@ class LinFileSystemCollector(ACollector):
 			t.join()
 
 
-		self.raw_result = []
+		self.raw_result = {File.element_name:[]}
 		for t in threads:
-			self.raw_result.append(t.result)
+			self.raw_result[File.element_name].append(t.result)
 
 	def make_diff(run_id_a, run_id_b, a, b, report):
 		"""
