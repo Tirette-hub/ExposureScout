@@ -42,10 +42,6 @@ class TestRule(unittest.TestCase):
 		r2 = Filter.Rule(Filter.Include, "test_level", "test_collector","test_element", "test_target", r"")
 		r3 = Filter.Rule(Filter.Exclude, "test_level", "test_collector","test_element", "test_target", r"")
 
-		print(r1 == r2)
-		print(isinstance(r1, Filter.Rule))
-		print(isinstance(r2, Filter.Rule))
-
 		self.assertEqual(r1, r2)
 		self.assertNotEqual(r1, r3)
 
@@ -56,7 +52,6 @@ class TestRule(unittest.TestCase):
 		rule = Filter.Rule(Filter.Include, Filter.ElementLevel, modules.LinUsersCollector, modules.User.element_name, "name", r"[a-zA-Z]*[0-9]+[a-zA-Z]*")
 		# rule = ```INCLUDE any USER having numbers in its NAME```
 
-		print(rule)
 		user1 = modules.User(42, "liveis42", [42])
 		user2 = modules.User(1001, "test", [1001])
 
