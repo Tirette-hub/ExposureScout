@@ -6,7 +6,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.1.0
+0.2.0
 """
 
 
@@ -40,6 +40,21 @@ class CollectorList:
 
 	def __getitem__(self, item):
 		return self.collectors[item]
+
+	def __contains__(self, item):
+		if item in self.collectors:
+			return True
+
+		if item in self.names:
+			return True
+
+		if item in self.types:
+			return True
+
+		return False
+
+	def __len__(self):
+		return len(self.collectors)
 
 	def append(self, collector):
 		"""
