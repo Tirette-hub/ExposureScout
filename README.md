@@ -16,7 +16,7 @@ One of the major advantages of this tool relies on its need of no other requirem
 This application having been imagined as modular as possible provides multiple ways to be used. Either as a standalone CLI or GUI application or even as a module itself, allowing the user to develop a simple script for plug-and-play usage.
 
 ### CLI
-_WIP_
+The `main.py` file contains the application that is based on the package itself. You can easily run it using `python3 main.py` and simply follow the instructions on the screen. You can run personnalised snapshots, make a _diff_ between two snapshots, visualize the reports in a python _dict_ data structure, export and import both snapshots and reports (currently only BINARY solution available) and manage your application memory thanks to the [Analysis Manager](./docs/AM.md)
 
 ### GUI
 _WIP_
@@ -28,7 +28,7 @@ Please refer to the [examples](./examples) README in order to get a better descr
 
 ## Current list of collectors
 - LinUsersCollector : used to collect Linux/Unix users, groups and sudoers
-
+- LinFileSystemCollector : used to collect Linux/Unix File System
 
 ## Application Architecture
 _Exposure Scout_ relies on two simple modules: _modules_ and _core_. It also provides useful directories to store reports, documentation, scripts and provide some practical examples and test files.

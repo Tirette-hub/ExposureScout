@@ -15,7 +15,8 @@ This is the heart of the application. It manages all the collectors, the snapsho
         - [resume_running](#resume_running)
         - [quit_running](#quit_running)
         - [show_running_status](#show_running_status)
-        - [run_snapshot](#run_snapshotrun_id-collectors)
+        - [add_collector](#add_collectorcollector)
+        - [run_snapshot](#run_snapshotrun_id)
         - [make_diff](#make_difffirst_run-second_run-report_id--none)
         - [export_report](#export_reportreport_id-method--bin-db--none-buf_size--64)
         - [import_report](#import_reportreport_id-method--bin-db--none-buf_size--64)
@@ -28,9 +29,10 @@ It can also manage the memory used by the different runs (you can dump runs to f
 *Attributes*:
 - runs (dict{str:[CollectorList](./MODULES.md#collectorlist)}): the different runs in memory that are ready to use (to be analyzed or to be stored). Every run is identified by its run id as a string and its collectors.
 - running_snapshot (str): used to know what snapshot is running, using its run_id.
-- running_snapshot_threads (list[threading.Thread]): list of all the threads running for the running snapshot.
+- running_snapshot_threads (list\[[threading.Thread](https://docs.python.org/3/library/threading.html#threading.Thread)\]): list of all the threads running for the running snapshot.
 - snapshot_paused (bool): flag used to know if the running snapshot has been paused or not.
-- diff_reports (dict{str : DiffReport}): list of reports of differences between two snapshots that have been performed.
+- awaiting_collectors (list\[[ACollector](./COLLECTOR.md#acollector)\]): list of collectors awaiting to be run.
+- diff_reports (dict{str : [DiffReport](./REPORT.md#diffreportfirst_run_id-second_run_id)}): list of reports of differences between two snapshots that have been performed.
 
 ### is_running()
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Get the running status.
@@ -102,6 +104,12 @@ _WIP_
 
 ### show_running_status()
 _WIP_
+
+### add_collector(_**collector**_):
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Append a collector to the list of awaiting collectors before to run it.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*Arguments*:\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_collector_ ([ACollector](./COLLECTOR.md#acollector)): collector to add in the list of the one used to run a snapshot.
 
 ### run_snapshot(_**run_id, collectors**_)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Runs collectors for a snapshot.

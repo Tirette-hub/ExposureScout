@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.1.6
+0.2.1
 """
 
 
@@ -788,7 +788,7 @@ class LinFileSystemCollector(ACollector):
 		else:
 			self.exclude_rules.append(rule)
 
-	def set_rules(self, rules):
+	def set_rules(self, rules, exclude=False):
 		"""
 		Add a list of directories to walk.
 

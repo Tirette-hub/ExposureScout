@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.1.5
+0.2.2
 """
 
 import time
@@ -315,6 +315,9 @@ class AnalysisManager:
 	def add_collector(self, collector):
 		"""
 		Append a collector to the list of awaiting collectors before to run it.
+
+		Arguments:
+			collector (ACollector): collector to add in the list of the one used to run a snapshot.
 		"""
 		self.awaiting_collectors.append(collector)
 
@@ -347,6 +350,8 @@ class AnalysisManager:
 		#wait for the collector to finish collecting the data
 		for t in threads:
 			t.join()
+
+		self.awaiting_collectors = []
 
 		running_snapshot = None
 

@@ -27,8 +27,8 @@ For every object, it describes how it can be exported or loaded and how it is be
 	    - [is_parent_of](#is_parent_offile)
 	---------------------------------------------------
 	- [LinFileSystemCollector](#linfilesystemcollector)
-	    - [set_rule](#set_rulerule)
-	    - [set_rules](#set_rulesrules)
+	    - [set_rule](#set_rulerule-exclude--false)
+	    - [set_rules](#set_rulesrules-exclude--false)
 	    - [get_content](#get_content)
 	    - [walk_through](#walk_throughpath)
         ---------------------------------------------------
@@ -206,17 +206,19 @@ Inherits from [ACollector](./COLLECTOR.md#acollector).
 _Attributes_:
 - Inherits from [ACollector](./COLLECTOR.md#acollector)
 
-### set_rule(*__rule__*)
+### set_rule(*__rule, exclude=False__*)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Add directory to walk.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_Arguments_:\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rule (str): path to the directory to walk.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rule (str): path to the directory to walk.\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exclude (bool): flag that tells if the rule must be applied or not. (default: False)
 
-### set_rules(*__rules__*)
+### set_rules(*__rules, exclude=False__*)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Add a list of directories to walk.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_Arguments_:\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rules (list[str]): list of path to the directories to walk.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rules (list[str]): list of path to the directories to walk.\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exclude (bool): flag that tells if the rule must be applied or not. (default: False)
 
 ### get_content()
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Get the list of File System collector root files and directories it contains.
