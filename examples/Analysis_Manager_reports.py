@@ -8,7 +8,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.2.0
 """
 from exposurescout.core import AnalysisManager
 from exposurescout import modules
@@ -21,12 +21,26 @@ def main():
 	report_id = "test"
 
 	# run two snapshots
-	manager.run_snapshot(run_id_a, modules.AVAILABLE_COLLECTORS)
+
+	manager.add_collector(modules.LinUsersCollector())
+	# fscollector = modules.LinFileSystemCollector()
+	# fscollector.set_rule("/home")
+	# fscollector.set_rule("/home/test/", exclude=True)
+	# manager.add_collector(fscollector)
+
+	manager.run_snapshot(run_id_a)
 
 	while manager.is_running():
 		pass
 
-	manager.run_snapshot(run_id_b, modules.AVAILABLE_COLLECTORS)
+
+	manager.add_collector(modules.LinUsersCollector())
+	# fscollector = modules.LinFileSystemCollector()
+	# fscollector.set_rule("/home")
+	# fscollector.set_rule("/home/test/", exclude=True)
+	# manager.add_collector(fscollector)
+
+	manager.run_snapshot(run_id_b)
 
 	while manager.is_running():
 		pass

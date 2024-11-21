@@ -8,7 +8,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.2.0
 """
 from exposurescout.core import AnalysisManager
 from exposurescout import modules
@@ -18,7 +18,13 @@ def main():
 
 	run_id = "test" # str(datetime.now())
 
-	result = manager.run_snapshot(run_id, modules.AVAILABLE_COLLECTORS)
+	manager.add_collector(modules.LinUsersCollector())
+	# fscollector = modules.LinFileSystemCollector()
+	# fscollector.set_rule("/home")
+	# fscollector.set_rule("/home/test/", exclude=True)
+	# manager.add_collector(fscollector)
+
+	result = manager.run_snapshot(run_id)
 
 	while manager.is_running():
 		pass
