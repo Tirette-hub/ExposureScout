@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.1.4
+0.1.6
 """
 
 
@@ -756,7 +756,8 @@ class LinFileSystemCollector(ACollector):
 
 	def __init__(self):
 		super(LinFileSystemCollector, self).__init__()
-		self.rules = []
+		self.include_rules = []
+		self.exclude_rules = []
 
 	def __eq__(self, o):
 		if type(o) != LinFileSystemCollector:
@@ -774,14 +775,18 @@ class LinFileSystemCollector(ACollector):
 
 		return True
 
-	def set_rule(self, rule):
+	def set_rule(self, rule, exclude=False):
 		"""
 		Add directory to walk.
 
 		Arguments:
 			rule (str): path to the directory to walk.
+			exclude (bool): flag that tells if the rule must be applied or not. (default: False)
 		"""
-		self.rules.append(rule)
+		if not exclude:
+			self.include_rules.append(rule)
+		else:
+			self.exclude_rules.append(rule)
 
 	def set_rules(self, rules):
 		"""
@@ -789,8 +794,12 @@ class LinFileSystemCollector(ACollector):
 
 		Arguments:
 			rules (list[str]): list of path to the directories to walk.
+			exclude (bool): flag that tells if the rules must be applied or not. (default: False)
 		"""
-		self.rules = rules
+		if not exclude:
+			self.include_rules = rules
+		else:
+			self.exclude_rules = rules
 
 	def get_content(self):
 		"""
@@ -941,10 +950,24 @@ class LinFileSystemCollector(ACollector):
 		"""
 		# get the metadata
 		metadata = os.lstat(path)
-		
-		if os.path.isfile(path):
+
+		file = None
+
+		for excluded_path in self.exclude_rules:
+			if path.startswith(excluded_path):
+				return file
+
+		if os.path.islink(path):
+			return None
+
+		elif os.path.isfile(path):
 			# create the File data structure
-			content_hash = get_file_hash(path)
+			try:
+				content_hash = get_file_hash(path)
+			except OSError as e:
+				print(f"\tWARNING: {e} at {path}, content hash will be null.") # then file is None then /!\
+				content_hash = None
+
 			size = os.path.getsize(path)
 			file = File(path, metadata, size, content_hash)
 
@@ -956,27 +979,44 @@ class LinFileSystemCollector(ACollector):
 			file = Directory(path, metadata)
 
 			# scan the directory to get what it contains
-			with os.scandir(path) as it:
-				for entry in it:
-					# sort them by directory and file
-					if entry.is_dir():
-						directories.append(entry)
-					elif entry.is_file():
-						directories.append(entry)
+			try:
+				with os.scandir(path) as it:
+					for entry in it:
+						# sort them by directory and file
+						try:
+							if entry.is_symlink():
+								pass
+							if entry.is_dir():
+								directories.append(entry)
+							elif entry.is_file():
+								files.append(entry)
+						except OSError as e:
+							print(f"\tWARNING:\n{e}")
 
-			# walk through every directory
-			directories.sort(key=lambda x:x.name)
-			for directory in directories:
-				new_path = os.path.join(path, directory.name)
-				file.append(self.walk_through(new_path))
+				# walk through every directory
+				directories.sort(key=lambda x:x.name)
+				for directory in directories:
+					new_path = os.path.join(path, directory.name)
+					child = self.walk_through(new_path)
+					if child:
+						file.append(child)
 
-			# create every File object
-			files.sort(key=lambda x:x.name)
-			for new_file in files:
-				new_path = os.path.join(path, new_file.name)
-				metadata = os.lstat(new_path)
-				content_hash = get_file_hash(new_path)
-				file.append(File(new_path, metadata, content_hash))
+				# create every File object
+				files.sort(key=lambda x:x.name)
+				for new_file in files:
+					new_path = os.path.join(path, new_file.name)
+					metadata = os.lstat(new_path)
+					try:
+						content_hash = get_file_hash(new_path)
+					except OSError as e:
+						print(f"\tWARNING: {e} at {new_path}, content hash will be null.")
+						content_hash = None
+
+					size = os.path.getsize(new_path)
+					file.append(File(new_path, metadata, size, content_hash))
+
+			except PermissionError:
+				print(f"\tWARNING: access denied to {path}, passing.")
 
 		return file
 
@@ -984,7 +1024,7 @@ class LinFileSystemCollector(ACollector):
 		"""
 		Private method collecting the raw data.
 		"""
-		directories = self.rules
+		directories = self.include_rules
 		threads = []
 
 		for d in directories:
@@ -1000,7 +1040,9 @@ class LinFileSystemCollector(ACollector):
 
 		self.raw_result = {File.element_name:[]}
 		for t in threads:
-			self.raw_result[File.element_name].append(t.result)
+			r = t.result
+			if r:
+				self.raw_result[File.element_name].append(r)
 
 	def make_diff(run_id_a, run_id_b, a, b, report):
 		"""

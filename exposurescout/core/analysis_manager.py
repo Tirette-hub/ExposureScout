@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.1.0
+0.1.5
 """
 
 import time
@@ -35,6 +35,7 @@ class AnalysisManager:
 		running_snapshot (str): used to know what snapshot is running, using its run_id.
 		running_snapshot_threads (list[threading.Thread]): list of all the threads running for the running snapshot.
 		snapshot_paused (bool): flag used to know if the running snapshot has been paused or not.
+		awaiting_collectors (list[Collector]): list of collectors awaiting to be run.
 		diff_reports (dict{str : DiffReport}): list of reports of differences between two snapshots that have been performed.
 	"""
 	def __init__(self):
@@ -42,6 +43,8 @@ class AnalysisManager:
 		self.running_snapshot = None
 		self.running_snapshot_threads = None
 		self.snapshot_paused = False
+
+		self.awaiting_collectors = []
 
 		self.diff_reports = {}
 
@@ -309,26 +312,33 @@ class AnalysisManager:
 		"""
 		pass
 
-	def run_snapshot(self, run_id, collectors):
+	def add_collector(self, collector):
+		"""
+		Append a collector to the list of awaiting collectors before to run it.
+		"""
+		self.awaiting_collectors.append(collector)
+
+	def run_snapshot(self, run_id):
 		"""
 		Runs collectors for a snapshot.
 
 		Arguments:
 			run_id (str): identifier of the snapshot.
-			collectors (list[str]): list of collectors' name used for the analysis.
+
+		Raises:
+			ValueError: No collector to be run in the list.
 		"""
 		running_snapshot = run_id
 
 		threads = []
 
 		# create the collectors
-		collectors_objects = []
-		for collector in collectors:
-			collectors_objects.append(collector())
+		if len(self.awaiting_collectors) == 0:
+			raise ValueError("Not enough collectors to run a snapshot. You must provide at least one collector.")
 		# add the run in the run list
-		self.runs[run_id] = modules.CollectorList(collectors_objects)
+		self.runs[run_id] = modules.CollectorList(self.awaiting_collectors)
 		# run the collectors
-		for collector in collectors_objects:
+		for collector in self.awaiting_collectors:
 			t = threading.Thread(target = collector.run, args = ())
 			threads.append(t)
 		for t in threads:
