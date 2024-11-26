@@ -6,10 +6,10 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.3.0
 """
 
 from . import core
 from . import modules
 
-from .gui import gui
+from . import gui

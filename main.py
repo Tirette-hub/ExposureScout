@@ -26,10 +26,10 @@ o888ooooood8 o88'   888o  888bod8P' `Y8bod8P' 8""888P'  `V88V"V8P' d888b    `Y8b
 
 """
 
-from exposurescout import modules, core
+from exposurescout import modules
+from exposurescout import core
 
-import tkinter
-
+from multiprocessing import Process
 from datetime import datetime
 import time
 import os
@@ -127,10 +127,13 @@ class Application:
 
 				elif i == 1:
 					from exposurescout import gui
-					gui.main()
+					app = Process(target = gui.GUIApp().mainloop)
 					self.quit = True
+					app.start()
 					print("WIP")
 					print()
+
+					#os._exit(0)
 
 				elif i == 2:
 					self.state = SNAP
@@ -523,3 +526,4 @@ class Application:
 if __name__ == '__main__':
 	app = Application()
 	app.run()
+	os._exit(0)

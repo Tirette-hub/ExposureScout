@@ -9,8 +9,7 @@ Version:
 0.3.0
 """
 
-from ..core import AnalysisManager
-from .. import modules
+#from ..core.analysis_manager import AnalysisManager
 
 import tkinter as tk
 from tkinter import ttk
@@ -20,14 +19,20 @@ def main():
 
 	app.mainloop()
 
+def on_help(url):
+	import webbrowser
+	webbrowser.open(url)
 
 class GUIApp(tk.Tk):
 	def __init__(self, *args, **kwargs):
 		super(GUIApp, self).__init__(*args, **kwargs)
-		self.manager = AnalysisManager()
+		#self.manager = AnalysisManager()
 		self.minsize(950, 682)
 		self.geometry("950x650")
 		self.title("Exposure Scout")
+
+		#from .. import modules
+		# import Available collectors
 
 		# Menu bar
 		menu = tk.Menu(self)
@@ -47,15 +52,13 @@ class GUIApp(tk.Tk):
 		edit_menu.add_command(label="dump snap", command=self.on_dump)
 		edit_menu.add_command(label="dump rpt", command=self.on_dump)
 
-		"""
 		help_menu = tk.Menu(menu, tearoff=0)
-		help_menu.add_command(label="Help Index", command=self.on_help)
-		help_menu.add_command(label="About", command=self.on_help)
-		"""
+		help_menu.add_command(label="Help Index", command=lambda :on_help("https://github.com/Tirette-hub/ExposureScout"))
+		help_menu.add_command(label="About", command=lambda :on_help("https://github.com/Tirette-hub/ExposureScout"))
 
 		menu.add_cascade(menu=file_menu, label="File")
 		menu.add_cascade(menu=edit_menu, label="Edit")
-		#menu.add_cascade(menu=help_menu, label="Help")
+		menu.add_cascade(menu=help_menu, label="Help")
 
 		# Cut the app in 4 major frames
 		self.snapshot_frame = tk.Frame(self)
