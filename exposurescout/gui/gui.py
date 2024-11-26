@@ -9,7 +9,7 @@ Version:
 0.3.0
 """
 
-#from ..core.analysis_manager import AnalysisManager
+from ..core.analysis_manager import AnalysisManager
 
 import tkinter as tk
 from tkinter import ttk
@@ -24,15 +24,16 @@ def on_help(url):
 	webbrowser.open(url)
 
 class GUIApp(tk.Tk):
-	def __init__(self, *args, **kwargs):
+	def __init__(self, *args, am = AnalysisManager(),**kwargs):
 		super(GUIApp, self).__init__(*args, **kwargs)
-		#self.manager = AnalysisManager()
+		self.manager = am
 		self.minsize(950, 682)
 		self.geometry("950x650")
 		self.title("Exposure Scout")
 
-		#from .. import modules
+		from .. import modules
 		# import Available collectors
+		self.collectors = modules.AVAILABLE_COLLECTORS
 
 		# Menu bar
 		menu = tk.Menu(self)
@@ -61,13 +62,13 @@ class GUIApp(tk.Tk):
 		menu.add_cascade(menu=help_menu, label="Help")
 
 		# Cut the app in 4 major frames
-		self.snapshot_frame = tk.Frame(self)
-		self.report_frame = tk.Frame(self)
-		self.AM_snapshot_frame = tk.Frame(self)
-		self.AM_report_frame = tk.Frame(self)
+		self.snapshot_frame = tk.Frame(self, highlightbackground="black", highlightthickness=1)
+		self.report_frame = tk.Frame(self, highlightbackground="black", highlightthickness=1)
+		self.AM_snapshot_frame = tk.Frame(self, highlightbackground="black", highlightthickness=1)
+		self.AM_report_frame = tk.Frame(self, highlightbackground="black", highlightthickness=1)
 
 		# Add in every frame another frame that will contain all the data relative to what it is meant to show
-		self.collectors_frame = tk.Frame(self.snapshot_frame, bg='blue')
+		self.collectors_frame = tk.Frame(self.snapshot_frame, highlightbackground="black", highlightthickness=1)
 		self.report_detail_frame = tk.Frame(self.report_frame)
 		self.snapshots_mem_frame = tk.Frame(self.AM_snapshot_frame)
 		self.reports_mem_frame = tk.Frame(self.AM_report_frame)
@@ -217,6 +218,13 @@ class GUIApp(tk.Tk):
 		self.rpt_dump_btn.grid(row=4, column=2, padx=5, pady=5)
 		self.rpt_export_btn.grid(row=4, column=3, padx=5, pady=5)
 
+
+		#create check box for collectors
+		self.collector_vars = []
+		for i, collector in enumerate(self.collectors):
+			var = tk.IntVar()
+			check_btn = tk.Checkbutton(self.collectors_frame, text=collector.name, variable=var, onvalue=i+1, offvalue=0)
+			check_btn.grid(row=i, column=0, padx=15, pady=15, sticky=tk.W)
 
 
 

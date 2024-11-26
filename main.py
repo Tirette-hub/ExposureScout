@@ -127,13 +127,11 @@ class Application:
 
 				elif i == 1:
 					from exposurescout import gui
-					app = Process(target = gui.GUIApp().mainloop)
+					app = Process(target = gui.GUIApp(am = self.manager).mainloop)
 					self.quit = True
 					app.start()
 					print("WIP")
 					print()
-
-					#os._exit(0)
 
 				elif i == 2:
 					self.state = SNAP
