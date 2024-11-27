@@ -21,4 +21,4 @@ site/
 *.db
 
 # special files
-_*
+_[A-Za-z0-9]*
