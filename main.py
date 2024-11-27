@@ -126,7 +126,7 @@ class Application:
 					continue
 
 				elif i == 1:
-					from exposurescout import gui
+					import gui
 					app = Process(target = gui.GUIApp(am = self.manager).mainloop)
 					self.quit = True
 					app.start()

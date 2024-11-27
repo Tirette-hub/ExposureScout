@@ -9,15 +9,11 @@ Version:
 0.3.0
 """
 
-from ..core.analysis_manager import AnalysisManager
+from exposurescout.core import AnalysisManager
+from exposurescout import modules
 
 import tkinter as tk
 from tkinter import ttk
-
-def main():
-	app = GUIApp()
-
-	app.mainloop()
 
 def on_help(url):
 	import webbrowser
@@ -31,7 +27,6 @@ class GUIApp(tk.Tk):
 		self.geometry("950x650")
 		self.title("Exposure Scout")
 
-		from .. import modules
 		# import Available collectors
 		self.collectors = modules.AVAILABLE_COLLECTORS
 
@@ -249,6 +244,11 @@ class GUIApp(tk.Tk):
 	def on_quit(self):
 		print("quit")
 
+
+def main():
+	app = GUIApp()
+
+	app.mainloop()
 
 
 if __name__ == '__main__':

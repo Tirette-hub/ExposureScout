@@ -11,5 +11,3 @@ Version:
 
 from . import core
 from . import modules
-
-from . import gui
