@@ -130,8 +130,9 @@ class Application:
 					app = Process(target = gui.GUIApp(am = self.manager).mainloop)
 					self.quit = True
 					app.start()
-					print("WIP")
-					print()
+					#print("WIP")
+					#print()
+					os._exit(0)
 
 				elif i == 2:
 					self.state = SNAP

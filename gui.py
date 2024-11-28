@@ -15,6 +15,8 @@ from exposurescout import modules
 import tkinter as tk
 from tkinter import ttk
 
+import os
+
 def on_help(url):
 	import webbrowser
 	webbrowser.open(url)
@@ -34,19 +36,19 @@ class GUIApp(tk.Tk):
 		menu = tk.Menu(self)
 
 		file_menu = tk.Menu(menu, tearoff=0)
-		file_menu.add_command(label="open", command=self.on_open)
+		file_menu.add_command(label="open", command=lambda: self.on_open())
 		file_menu.add_separator()
-		file_menu.add_command(label="quit", command=self.on_quit)
+		file_menu.add_command(label="quit", command=lambda: self.on_quit())
 
 		edit_menu = tk.Menu(menu, tearoff=0)
-		edit_menu.add_command(label="import snap", command=self.on_open)
-		edit_menu.add_command(label="export snap", command=self.on_save)
+		edit_menu.add_command(label="import snap", command=lambda: self.on_open(file="snap"))
+		edit_menu.add_command(label="export snap", command=lambda: self.on_save(file="snap"))
 		edit_menu.add_separator()
-		edit_menu.add_command(label="import snap", command=self.on_open)
-		edit_menu.add_command(label="export snap", command=self.on_save)
+		edit_menu.add_command(label="import rpt", command=lambda: self.on_open(file="rpt"))
+		edit_menu.add_command(label="export rpt", command=lambda: self.on_save(file="rpt"))
 		edit_menu.add_separator()
-		edit_menu.add_command(label="dump snap", command=self.on_dump)
-		edit_menu.add_command(label="dump rpt", command=self.on_dump)
+		edit_menu.add_command(label="dump snap", command=lambda: self.on_dump(file="snap"))
+		edit_menu.add_command(label="dump rpt", command=lambda: self.on_dump(file="rpt"))
 
 		help_menu = tk.Menu(menu, tearoff=0)
 		help_menu.add_command(label="Help Index", command=lambda :on_help("https://github.com/Tirette-hub/ExposureScout"))
@@ -72,46 +74,52 @@ class GUIApp(tk.Tk):
 		snapshot_label = tk.Label(self.snapshot_frame, text="Run id : ")
 		self.run_id_var = tk.StringVar()
 		run_id_entry = tk.Entry(self.snapshot_frame, textvariable=self.run_id_var)
-		self.run_snapshot_btn = tk.Button(self.snapshot_frame, text="Run", command=self.on_run_snap)
+		self.run_snapshot_btn = tk.Button(self.snapshot_frame, text="Run", command=lambda: self.on_run_snap())
 
 		# Static widgets dedicated to run and inspect reports
 		snap1_label = tk.Label(self.report_frame, text="Snapshot 1 : ")
 		self.snap1_var = tk.StringVar()
-		snap1_entry = tk.Entry(self.report_frame, textvariable=self.snap1_var)
+		self.snap1_combobox = ttk.Combobox(self.report_frame, textvariable=self.snap1_var)
 
 		vs_label = tk.Label(self.report_frame, text="vs")
 
 		snap2_label = tk.Label(self.report_frame, text="Snapshot 2 : ")
 		self.snap2_var = tk.StringVar()
-		snap2_entry = tk.Entry(self.report_frame, textvariable=self.snap2_var)
+		self.snap2_combobox = ttk.Combobox(self.report_frame, textvariable=self.snap2_var)
 
 		report_id_label = tk.Label(self.report_frame, text="Report id : ")
 		self.report_id_var = tk.StringVar()
 		report_id_entry = tk.Entry(self.report_frame, textvariable=self.report_id_var)
-		self.report_run = tk.Button(self.report_frame, text="Run", command=self.on_run_rpt)
+		self.report_run = tk.Button(self.report_frame, text="Run", command=lambda: self.on_run_rpt())
 
 		# Static widgets dedicated to snapshot management
-		self.snap_send_btn = tk.Button(self.AM_snapshot_frame, text="<|", command=self.on_send)
-		self.snap_import_btn = tk.Button(self.AM_snapshot_frame, text="Import", command=self.on_open)
-		self.snap_dump_btn = tk.Button(self.AM_snapshot_frame, text="Dump", command=self.on_dump)
-		self.snap_export_btn = tk.Button(self.AM_snapshot_frame, text="Export", command=self.on_save)
+		self.snap_send_btn = tk.Button(self.AM_snapshot_frame, text="<|", command=lambda: self.on_send(file="snap"))
+		self.snap_import_btn = tk.Button(self.AM_snapshot_frame, text="Import", command=lambda: self.on_open(file="snap"))
+		self.snap_dump_btn = tk.Button(self.AM_snapshot_frame, text="Dump", command=lambda: self.on_dump(file="snap"))
+		self.snap_export_btn = tk.Button(self.AM_snapshot_frame, text="Export", command=lambda: self.on_save(file="snap"))
 
 		# Static widgets dedicated to snapshot management
-		self.rpt_send_btn = tk.Button(self.AM_report_frame, text="<|", command=self.on_send)
-		self.rpt_import_btn = tk.Button(self.AM_report_frame, text="Import", command=self.on_open)
-		self.rpt_dump_btn = tk.Button(self.AM_report_frame, text="Dump", command=self.on_dump)
-		self.rpt_export_btn = tk.Button(self.AM_report_frame, text="Export", command=self.on_save)
+		self.rpt_send_btn = tk.Button(self.AM_report_frame, text="<|", command=lambda: self.on_send(file="rpt"))
+		self.rpt_import_btn = tk.Button(self.AM_report_frame, text="Import", command=lambda: self.on_open(file="rpt"))
+		self.rpt_dump_btn = tk.Button(self.AM_report_frame, text="Dump", command=lambda: self.on_dump(file="rpt"))
+		self.rpt_export_btn = tk.Button(self.AM_report_frame, text="Export", command=lambda: self.on_save(file="rpt"))
 
 		# Snapshot AM treeview
 		self.snap_mem_tv = ttk.Treeview(self.snapshots_mem_frame)
+		#self.snap_mem_tv["columns"]=("snapshot run id",)
+		self.snap_mem_tv.heading("# 0", text="snapshot run id")
 		self.snap_mem_scroll = ttk.Scrollbar(self.snapshots_mem_frame, command=self.snap_mem_tv.yview)
 
 		# Report AM treeview
 		self.rpt_mem_tv = ttk.Treeview(self.reports_mem_frame)
+		#self.rpt_mem_tv["columns"]=("diff report id",)
+		self.rpt_mem_tv.heading("# 0", text="diff report id")
 		self.rpt_mem_scroll = ttk.Scrollbar(self.reports_mem_frame, command=self.rpt_mem_tv.yview)
 
 		# Report details treeview
 		self.report_detail_tv = ttk.Treeview(self.report_detail_frame)
+		#self.report_detail_tv["columns"]=("diff report details",)
+		self.report_detail_tv.heading("# 0", text="diff report details")
 		self.report_detail_scroll = ttk.Scrollbar(self.report_detail_frame, command=self.report_detail_tv.yview)
 
 		# set them all on the app
@@ -153,10 +161,10 @@ class GUIApp(tk.Tk):
 		# self.report_frame.grid_columnconfigure(5, weight=0)
 
 		snap1_label.grid(row=0, column=0, sticky=tk.W, pady=5)
-		snap1_entry.grid(row=0, column=1, sticky=tk.EW, pady=5)
+		self.snap1_combobox.grid(row=0, column=1, sticky=tk.EW, pady=5)
 		vs_label.grid(row=0, column=2, pady=5)
 		snap2_label.grid(row=0, column=3, sticky=tk.E, pady=5)
-		snap2_entry.grid(row=0, column=4, sticky=tk.EW, pady=5)
+		self.snap2_combobox.grid(row=0, column=4, sticky=tk.EW, pady=5)
 
 		report_id_label.grid(row=1, column=3, sticky=tk.E)
 		report_id_entry.grid(row=1, column=4, sticky=tk.EW)
@@ -186,6 +194,8 @@ class GUIApp(tk.Tk):
 		self.snapshots_mem_frame.grid_columnconfigure(0, weight=1)
 		self.snapshots_mem_frame.grid_columnconfigure(1)
 		self.snap_mem_tv.grid(row=0, column=0, sticky=tk.NSEW)
+		self.snap_mem_var = tk.StringVar()
+		self.snap_mem_tv.tag_bind("snap_selection_tag", "<<TreeviewSelect>>", lambda event: self.on_tv_select(self.snap_mem_var, event))
 		self.snap_mem_scroll.grid(row=0, column=1, sticky=tk.E+tk.NS)
 		self.snap_import_btn.grid(row=4, column=1, padx=5, pady=5)
 		self.snap_dump_btn.grid(row=4, column=2, padx=5, pady=5)
@@ -208,6 +218,8 @@ class GUIApp(tk.Tk):
 		self.reports_mem_frame.grid_columnconfigure(0, weight=1)
 		self.reports_mem_frame.grid_columnconfigure(1)
 		self.rpt_mem_tv.grid(row=0, column=0, sticky=tk.NSEW)
+		self.rpt_mem_var = tk.StringVar()
+		self.rpt_mem_tv.tag_bind("rpt_selection_tag", "<<TreeviewSelect>>", lambda event: self.on_tv_select(self.rpt_mem_var, event))
 		self.rpt_mem_scroll.grid(row=0, column=1, sticky=tk.E+tk.NS)
 		self.rpt_import_btn.grid(row=4, column=1, padx=5, pady=5)
 		self.rpt_dump_btn.grid(row=4, column=2, padx=5, pady=5)
@@ -218,28 +230,227 @@ class GUIApp(tk.Tk):
 		self.collector_vars = []
 		for i, collector in enumerate(self.collectors):
 			var = tk.IntVar()
-			check_btn = tk.Checkbutton(self.collectors_frame, text=collector.name, variable=var, onvalue=i+1, offvalue=0)
+			check_btn = tk.Checkbutton(self.collectors_frame, text=collector.name, variable=var, onvalue=i+1, offvalue=0) # /!\ value is +1 compared to the list index!
 			check_btn.grid(row=i, column=0, padx=15, pady=15, sticky=tk.W)
+			self.collector_vars.append(var)
+
+		# Setup treeview with the manager content (if provided, otherwize it just passes)
+		for run_id in self.manager.runs.keys():
+			self.snap_mem_tv.insert("", tk.END, text=run_id, tags=("snap_selection_tag",))
+
+		for report_id in self.manager.diff_reports.keys():
+			self.rpt_mem_tv.insert("", tk.END, text=report_id, tags=("rpt_selection_tag",))
+
+		# set combobox with possible values
+		self.snap1_combobox['values'] = list(self.manager.runs.keys())
+		self.snap2_combobox['values'] = list(self.manager.runs.keys())
+		# for run_id in self.manager.runs.keys():
+		# 	self.snap1_combobox['values'] += [run_id]
+		# 	self.snap2_combobox['values'] += [run_id]
 
 
+	def on_dump(self, file):
+		"""
+		Arguments:
+			file (str): file type beeing saved. Must be either 'snap' or 'rpt'.
+		"""
+		if file == 'snap':
+			if self.snap_mem_var.get() != "" and self.snap_mem_var.get() != None:
+				self.manager.dump(self.snap_mem_var.get())
+				selected_item = self.snap_mem_tv.selection()[0]
+				self.snap_mem_tv.delete(selected_item)
 
-	def on_dump(self):
-		print("on_dump")
+				# remove the possibility to select it from the diff making panel
+				self.snap1_combobox['values'].remove(self.snap_mem_var.get())
+				self.snap2_combobox['values'].remove(self.snap_mem_var.get())
+
+		elif file == 'rpt':
+			if self.rpt_mem_var.get() != "" and self.rpt_mem_var.get() != None:
+				self.manager.dump_report(self.rpt_mem_var.get())
+				selected_item = self.rpt_mem_tv.selection()[0]
+				self.rpt_mem_tv.delete(selected_item)
+				
+		else:
+			raise ValueError(f"Unknown file format. Expected 'snap' or 'rpt', but received '{file}'.")
 
 	def on_run_snap(self):
-		print("on_run_snap")
+		run_id = self.run_id_var.get()
+		if run_id != "" or run_id != None:
+			if run_id in self.manager.runs.keys():
+				# show info on duplicated run_id
+				pass
+
+			else:
+				for c in self.collector_vars:
+					if c.get() > 0:
+						collector = self.collectors[c.get()-1]()
+
+						if collector.name == "File System Collector":
+							collector.set_rule("/dev")
+							collector.set_rule("/home")
+							collector.set_rule("/media")
+							collector.set_rule("/mnt")
+							collector.set_rule("/opt")
+							collector.set_rule("/srv")
+							# collector.set_rule("/sys")
+							collector.set_rule("/usr")
+							collector.set_rule("/var")
+
+							collector.set_rule("/var/run", exclude=True)
+							#collector.set_rule("/sys/block", exclude=True)
+
+						#print(f"Adding collector {c.get()-1}: {collector}")
+						self.manager.add_collector(collector)
+
+				self.manager.run_snapshot(run_id)
+				self.snap_mem_tv.insert("", tk.END, text=run_id, tags=("snap_selection_tag",))
+
+				# add it to the diff making available snapshots list
+				if len(self.snap1_combobox['values']) == 0:
+					self.snap1_combobox['values'] = [run_id]
+				else:
+					self.snap1_combobox['values'] += (run_id,)
+					
+				if len(self.snap2_combobox['values']) == 0:
+					self.snap2_combobox['values'] = [run_id]
+				else:
+					self.snap2_combobox['values'] += (run_id,)
 
 	def on_run_rpt(self):
 		print("on_run_rpt")
 
-	def on_open(self):
-		print("on_open")
+	def on_open(self, file="both"):
+		"""
+		Callback when open file buttons are triggered.
 
-	def on_save(self):
-		print("on_save")
+		Arguments:
+			file (str): kind of files to open. values are "snap", "rpt" or "both". (default = "both")
+		"""
+		if file != "both" and file != "snap" and file != "rpt":
+			raise ValueError(f"File type unknown. Expected 'snap' or 'rpt' or 'both', but received {file}")
 
-	def on_send(self):
-		print("on_send")
+		bg_frame = tk.Frame(self, bg='white')
+		#frame.attributes("-alpha", 0.5)
+		bg_frame.grid(row=0, column=0, rowspan=2, columnspan=2, sticky=tk.NSEW)
+
+		frame = tk.Frame(bg_frame, width=300, height=200)
+		frame.place(relx=.5, rely=.5, anchor=tk.CENTER)
+
+		frame.grid_rowconfigure(0, weight=6)
+		frame.grid_rowconfigure(1, weight=1)
+		frame.grid_columnconfigure(0, weight=1)
+		frame.grid_columnconfigure(1, weight=1)
+		frame.grid_rowconfigure(2, weight=1)
+
+		listing = ttk.Treeview(frame)
+		listing.heading("# 0", text="file")
+		listing.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
+		var = tk.StringVar()
+		listing.tag_bind("selection_tag", "<<TreeviewSelect>>", lambda event: self.on_tv_select(var, event))
+
+		for f in os.listdir("reports/"):
+			if file == 'both' or file == 'snap':
+				if f.endswith('.snap'):
+					item = listing.insert("", tk.END, text=f, tags=("selection_tag",))
+					#listing.selection_add(item)
+
+			if file == 'both' or file == 'rpt':
+				if f.endswith('.rpt'):
+					item = listing.insert("", tk.END, text=f, tags=("selection_tag",))
+					#listing.selection_add(item)
+
+
+		button_cancel = tk.Button(frame, text="Cancel", width="30", command=bg_frame.destroy)
+		button_cancel.grid(row=1, column=0, padx=10)
+
+		button_ok = tk.Button(frame, text="OK", width="30", command=lambda:self.on_import(bg_frame, var))
+		button_ok.grid(row=1, column=1, padx=10)
+
+		tk.Label(frame, text="").grid(row=2, column=0, columnspan=2)
+
+	def on_tv_select(self, variable, event):
+		"""
+		Arguments:
+			variable (tkinter.StringVar): Variable storing the selected entry in the Treeview.
+			event (tkinter.VirtualEvent): Event triggered by the Treeview when selecting an item.
+		"""
+		tv = event.widget
+		variable.set(tv.item(tv.selection()[0])["text"])
+
+	def on_import(self, bg_frame, variable):
+		"""
+		Arguments:
+			frame (tkinter.Frame): Frame that will be destroyed after the import has been performed.
+			variable (tkinter.StringVar): Variable storing the file name to import.
+		"""
+		file = variable.get()
+
+		if file.endswith('.snap'):
+			if file.replace(".snap", "") not in self.manager.runs.keys():
+				self.snap_mem_tv.insert("", tk.END, text=file.replace(".snap", ""), tags=("snap_selection_tag",))
+				self.manager.load(file.replace(".snap", ""))
+
+				# add it to the diff making available snapshots list
+				if len(self.snap1_combobox['values']) == 0:
+					self.snap1_combobox['values'] = [file.replace(".snap", "")]
+				else:
+					self.snap1_combobox['values'] += (file.replace(".snap", ""),)
+
+				if len(self.snap2_combobox['values']) == 0:
+					self.snap2_combobox['values'] = [file.replace(".snap", "")]
+				else:
+					self.snap2_combobox['values'] += (file.replace(".snap", ""),)
+
+			else:
+				# show info
+				pass
+
+		elif file.endswith('.rpt'):
+			if file.replace(".rpt", "") not in self.manager.diff_reports.keys():
+				self.rpt_mem_tv.insert("", tk.END, text=file.replace(".rpt", ""), tags=("rpt_selection_tag",))
+				self.manager.import_report(file.replace(".rpt", ""))
+			else:
+				# show info
+				pass
+
+		else:
+			raise ValueError(f"Unknown file format. Expected '*.snap' or '*.rpt', but received '{file}'.")
+
+		bg_frame.destroy()
+
+	def on_save(self, file):
+		"""
+		Arguments:
+			file (str): file type beeing saved. Must be either 'snap' or 'rpt'.
+		"""
+		# TODO check if the file already exists + notify if no name provided
+		if file == 'snap':
+			if self.snap_mem_var.get() != "" and self.snap_mem_var.get() != None:
+				self.manager.save(self.snap_mem_var.get())
+			else:
+				pass
+
+		elif file == 'rpt':
+			if self.rpt_mem_var.get() != "" and self.rpt_mem_var.get() != None:
+				self.manager.export_report(self.rpt_mem_var.get())
+			else:
+				pass
+
+		else:
+			raise ValueError(f"Unknown file format. Expected 'snap' or 'rpt', but received '{file}'.")
+
+	def on_send(self, file):
+		"""
+		Arguments:
+			file (str): file type beeing saved. Must be either 'snap' or 'rpt'.
+		"""
+		if file == 'snap':
+			print(f"[WIP] on_send: {file}")
+
+		elif file == 'rpt':
+			print(f"[WIP] on_send: {file}")
+		else:
+			raise ValueError(f"Unknown file format. Expected 'snap' or 'rpt', but received '{file}'.")
 
 	def on_quit(self):
 		print("quit")
