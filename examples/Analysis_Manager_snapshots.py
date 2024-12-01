@@ -8,7 +8,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.2.0
+0.3.1
 """
 from exposurescout.core import AnalysisManager
 from exposurescout import modules
@@ -39,7 +39,7 @@ def main():
 		manager.load(run_id)
 		print("Snapshot loaded successfuly.")
 
-		print(manager.runs[run_id][0])
+		print(manager.runs[run_id])
 
 	else:
 		print("Failed to save.")
