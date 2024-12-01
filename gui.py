@@ -21,6 +21,18 @@ def on_help(url):
 	import webbrowser
 	webbrowser.open(url)
 
+def get_status_by_id(status):
+	if status == 0:
+		return "Created"
+	elif status == 1:
+		return "Deleted"
+	elif status == 2:
+		return "Modified"
+	elif status == 3:
+		return "Unknown"
+	else:
+		return ValueError(f"Unknow status id {status}.")
+
 class GUIApp(tk.Tk):
 	def __init__(self, *args, am = AnalysisManager(),**kwargs):
 		super(GUIApp, self).__init__(*args, **kwargs)
@@ -117,9 +129,14 @@ class GUIApp(tk.Tk):
 		self.rpt_mem_scroll = ttk.Scrollbar(self.reports_mem_frame, command=self.rpt_mem_tv.yview)
 
 		# Report details treeview
-		self.report_detail_tv = ttk.Treeview(self.report_detail_frame)
+		self.selected_report = tk.StringVar()
+		columns = ("data", "snapshot id", "status")
+		self.report_detail_tv = ttk.Treeview(self.report_detail_frame, columns=columns, show="tree headings")
 		#self.report_detail_tv["columns"]=("diff report details",)
-		self.report_detail_tv.heading("# 0", text="diff report details")
+		self.report_detail_tv.heading("# 0", text="elements")
+		for i, col in enumerate(columns, 1):
+			self.report_detail_tv.heading(f"# {i}", text=col)
+		self.report_detail_tv.tag_bind("open_tag", "<<TreeviewOpen>>", lambda x: self.on_tv_open(x))
 		self.report_detail_scroll = ttk.Scrollbar(self.report_detail_frame, command=self.report_detail_tv.yview)
 
 		# set them all on the app
@@ -257,18 +274,27 @@ class GUIApp(tk.Tk):
 		if file == 'snap':
 			if self.snap_mem_var.get() != "" and self.snap_mem_var.get() != None:
 				self.manager.dump(self.snap_mem_var.get())
-				selected_item = self.snap_mem_tv.selection()[0]
-				self.snap_mem_tv.delete(selected_item)
+				selected_item = self.snap_mem_tv.selection()
+				if selected_item != ():
+					selected_item = selected_item[0]
+					self.snap_mem_tv.delete(selected_item)
 
-				# remove the possibility to select it from the diff making panel
-				self.snap1_combobox['values'].remove(self.snap_mem_var.get())
-				self.snap2_combobox['values'].remove(self.snap_mem_var.get())
+					# remove the possibility to select it from the diff making panel
+					items = list(self.snap1_combobox['values'])
+					items.remove(self.snap_mem_var.get())
+					self.snap1_combobox['values'] = items
+
+					items = list(self.snap2_combobox['values'])
+					items.remove(self.snap_mem_var.get())
+					self.snap2_combobox['values'] = items
 
 		elif file == 'rpt':
 			if self.rpt_mem_var.get() != "" and self.rpt_mem_var.get() != None:
 				self.manager.dump_report(self.rpt_mem_var.get())
-				selected_item = self.rpt_mem_tv.selection()[0]
-				self.rpt_mem_tv.delete(selected_item)
+				selected_item = self.rpt_mem_tv.selection()
+				if selected_item != ():
+					selected_item = selected_item[0]
+					self.rpt_mem_tv.delete(selected_item)
 				
 		else:
 			raise ValueError(f"Unknown file format. Expected 'snap' or 'rpt', but received '{file}'.")
@@ -317,7 +343,23 @@ class GUIApp(tk.Tk):
 					self.snap2_combobox['values'] += (run_id,)
 
 	def on_run_rpt(self):
-		print("on_run_rpt")
+		name = self.report_id_var.get()
+		snap1 = self.snap1_var.get()
+		snap2 = self.snap2_var.get()
+
+		if snap1 == "" or snap1 == None or snap2 == "" or snap2 == None:
+			#TODO: alert/info
+			print("alert")
+			pass
+		else:
+			print("do it")
+			if name == "" or name == None:
+				name = snap1 + " vs " + snap2
+
+			# run report
+			self.manager.make_diff(snap1, snap2, report_id=name)
+			# add it to the memory treeview
+			self.rpt_mem_tv.insert("", tk.END, text=name, tags=("rpt_selection_tag",))
 
 	def on_open(self, file="both"):
 		"""
@@ -372,10 +414,20 @@ class GUIApp(tk.Tk):
 		"""
 		Arguments:
 			variable (tkinter.StringVar): Variable storing the selected entry in the Treeview.
-			event (tkinter.VirtualEvent): Event triggered by the Treeview when selecting an item.
+			event (tkinter.Event): Event triggered by the Treeview when selecting an item.
 		"""
 		tv = event.widget
 		variable.set(tv.item(tv.selection()[0])["text"])
+
+	def on_tv_open(self, event):
+		"""
+
+		"""
+		report_id = self.selected_report.get()
+		item_id = self.report_detail_tv.selection()[0]
+		collector = self.report_detail_tv.item(item_id)["text"]
+		for element in self.manager.diff_reports[report_id].diff_elemnts[collector]:
+			self.report_detail_tv.insert(item_id, tk.END, text = str(element))
 
 	def on_import(self, bg_frame, variable):
 		"""
@@ -448,7 +500,25 @@ class GUIApp(tk.Tk):
 			print(f"[WIP] on_send: {file}")
 
 		elif file == 'rpt':
-			print(f"[WIP] on_send: {file}")
+			for item in self.report_detail_tv.get_children():
+				#clear any previous data in the TreeView
+				self.report_detail_tv.delete(item)
+			# get the selected report_id
+			# set the selected_report string var
+			# fill the report_detail_tv with collectors names
+			report_id = self.rpt_mem_var.get()
+			self.report_id_var.set(report_id)
+			if report_id != "" and report_id != None:
+				self.selected_report.set(report_id)
+				for collector in self.manager.diff_reports[report_id].diff_elemnts.keys():
+					collector_item = self.report_detail_tv.insert("", tk.END, text=collector)#, tags=("open_tag",))
+					for collectible in self.manager.diff_reports[report_id].diff_elemnts[collector].keys():
+						collectible_item = self.report_detail_tv.insert(collector_item, tk.END, text=collectible + " collectibles")
+						for data in self.manager.diff_reports[report_id].diff_elemnts[collector][collectible]:
+							val = (str(data.element), data.run_id, get_status_by_id(data.type))
+							self.report_detail_tv.insert(collectible_item, tk.END, text=collectible, values=val)
+			else:
+				pass
 		else:
 			raise ValueError(f"Unknown file format. Expected 'snap' or 'rpt', but received '{file}'.")
 
