@@ -8,7 +8,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.2.0
+0.3.1
 """
 from exposurescout.core import AnalysisManager
 from exposurescout import modules
@@ -47,15 +47,15 @@ def main():
 
 	# hardcode differences (if you want to)
 
-	# new_user = User(1001, "test", [1001])
-	# new_group = Group(1001, "test")
-	# new_sudoer = Sudoer(1001)
+	# new_user = modules.User(1001, "test", [1001])
+	# new_group = modules.Group(1001, "test")
+	# new_sudoer = modules.Sudoer(1001)
 
-	# manager.runs[run_id_b][0].raw_result[0].append(new_user)
-	# manager.runs[run_id_b][0].raw_result[1].append(new_group)
-	# manager.runs[run_id_b][0].raw_result[2].append(new_sudoer)
-	# manager.runs[run_id_b][0].raw_result[3] = b""
-	# manager.runs[run_id_b][0].raw_result[4] = b""
+	# manager.runs[run_id_b][0].raw_result[modules.User.element_name].append(new_user)
+	# manager.runs[run_id_b][0].raw_result[modules.Group.element_name].append(new_group)
+	# manager.runs[run_id_b][0].raw_result[modules.Sudoer.element_name].append(new_sudoer)
+	# manager.runs[run_id_b][0].raw_result["passwd_hash"] = b""
+	# manager.runs[run_id_b][0].raw_result["group_hash"] = b""
 
 	# make the diff between the two snapshots
 	manager.make_diff(run_id_a, run_id_b, report_id)

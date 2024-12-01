@@ -26,8 +26,10 @@ o888ooooood8 o88'   888o  888bod8P' `Y8bod8P' 8""888P'  `V88V"V8P' d888b    `Y8b
 
 """
 
-from exposurescout import modules, core
+from exposurescout import modules
+from exposurescout import core
 
+from multiprocessing import Process
 from datetime import datetime
 import time
 import os
@@ -38,6 +40,7 @@ DIFF=2
 MEM=3
 MEM_INSPECT = 4
 RUN=5
+
 
 class Application:
 	def __init__(self):
@@ -123,8 +126,13 @@ class Application:
 					continue
 
 				elif i == 1:
-					print("WIP")
-					print()
+					import gui
+					app = Process(target = gui.GUIApp(am = self.manager).mainloop)
+					self.quit = True
+					app.start()
+					#print("WIP")
+					#print()
+					os._exit(0)
 
 				elif i == 2:
 					self.state = SNAP
@@ -517,3 +525,4 @@ class Application:
 if __name__ == '__main__':
 	app = Application()
 	app.run()
+	os._exit(0)

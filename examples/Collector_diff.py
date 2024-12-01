@@ -8,7 +8,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.0.1
+0.3.1
 """
 from exposurescout.modules import LinUsersCollector, User, Group, Sudoer
 from exposurescout.core import DiffReport
@@ -27,9 +27,9 @@ def main():
 	new_group = Group(1001, "test")
 	new_sudoer = Sudoer(1001)
 
-	uc_b.raw_result[0].append(new_user)
-	uc_b.raw_result[1].append(new_group)
-	uc_b.raw_result[2].append(new_sudoer)
+	uc_b.raw_result[User.element_name].append(new_user)
+	uc_b.raw_result[Group.element_name].append(new_group)
+	uc_b.raw_result[Sudoer.element_name].append(new_sudoer)
 
 	run_id_a = "test_a"
 	run_id_b = "test_b"
