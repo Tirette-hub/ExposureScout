@@ -9,7 +9,7 @@ Authors:
 Nathan Amorison
 
 Version:
-0.2.1
+0.3.2
 """
 
 
@@ -84,9 +84,10 @@ class DiffFile(ACollectible):
 		"""
 		encoded = b""
 
-		name_len = len(self.path)
+		path_encoded = self.path.encode()
+		name_len = len(path_encoded)
 		encoded += VarInt.to_bytes(name_len)
-		encoded += self.path.encode()
+		encoded += path_encoded
 		encoded += VarInt.to_bytes(self.mode)
 		encoded += VarInt.to_bytes(self.inode)
 		encoded += VarInt.to_bytes(self.uid)
@@ -248,7 +249,10 @@ class File(ACollectible):
 
 			self.metadata_hash = None
 
-		self.content_hash = content_hash
+		if content_hash:
+			self.content_hash = content_hash
+		else:
+			self.content_hash = b"\x00"*16
 
 	def __repr__(self):
 		return str(self)
@@ -324,13 +328,19 @@ class File(ACollectible):
 		name = os.path.split(self.path)[-1]
 
 		if known_path and os.path.join(known_path, name) == self.path:
-			name_len = len(name)
+			# WHY do we want to get the len of the name as bytes instead of directly take the length of the name as char?
+			# lets take the following bytes: b"\xe2\x80\xaf" when you decode it, it shows " ". Which is exactly the same as b"\x20".
+			# so when taking the length of a string that as b"\xe2\x80\xaf" in it, it will be counted as a length of 1, where whe want the length as the number of bytes
+			# Therefore we encode it first.
+			encoded_name = name.encode()
+			name_len = len(encoded_name)
 			encoded += VarInt.to_bytes(name_len)
-			encoded += name.encode()
+			encoded += encoded_name
 		else:
-			name_len = len(self.path)
+			encoded_name = self.path.encode()
+			name_len = len(encoded_name)
 			encoded += VarInt.to_bytes(name_len)
-			encoded += self.path.encode()
+			encoded += encoded_name
 		encoded += VarInt.to_bytes(self.mode)
 		encoded += VarInt.to_bytes(self.inode)
 		encoded += VarInt.to_bytes(self.uid)
@@ -412,6 +422,8 @@ class File(ACollectible):
 		# 	raise ValueError(f"Metadata hash does not match the metadata, data might have been corrupted.")
 
 		# check the type of file beeing gathered and recover their specific data
+
+		file = None
 		if stat.S_ISDIR(mode):
 			file_number_len = VarInt.get_len(data[i:i+1])
 			file_number = VarInt.from_bytes(data[i:i+file_number_len])
@@ -426,7 +438,7 @@ class File(ACollectible):
 			file = Directory(path, None)
 			file.append_all(content)
 
-		elif stat.S_ISREG(mode):
+		else: #elif stat.S_ISREG(mode) or stat.S_ISLNK(mode):
 			content_hash = data[i:i+16]
 			i += 16
 
@@ -829,7 +841,7 @@ class LinFileSystemCollector(ACollector):
 		rest = data[i:]
 		files = []
 		for file in range(file_number):
-			file, rest = File.from_bytes(rest)
+			file, rest= File.from_bytes(rest)
 			files.append(file)
 
 		self.raw_result = {File.element_name:files}
@@ -936,7 +948,9 @@ class LinFileSystemCollector(ACollector):
 		for file in self.raw_result[File.element_name]:
 			encoded_data += file.to_bytes()
 
-		self.result = encoded_data
+		encoded_data_len = len(encoded_data)
+
+		self.result = LinFileSystemCollector.snapshot_elemnt_id + VarInt.to_bytes(encoded_data_len) + encoded_data
 
 	def walk_through(self, path):
 		"""
@@ -986,7 +1000,7 @@ class LinFileSystemCollector(ACollector):
 						try:
 							if entry.is_symlink():
 								pass
-							if entry.is_dir():
+							elif entry.is_dir():
 								directories.append(entry)
 							elif entry.is_file():
 								files.append(entry)
@@ -1284,8 +1298,6 @@ class LinFileSystemCollector(ACollector):
 			query = f"""SELECT inode, status FROM reports_files WHERE report_id=? AND run_id=?"""
 			request = db_cursor.execute(query, (report_id, run_id))
 			files = request.fetchall()
-
-			print(files)
 
 			if files and files != []:
 				for inode, status in files:
