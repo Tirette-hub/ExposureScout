@@ -150,7 +150,10 @@ class TestLinFileSystemCollector(unittest.TestCase):
 		directory = FSCollector.Directory(test_directory, metadata)
 		directory.append_all([file1, file2])
 
-		expected += directory.to_bytes()
+		encoded = b"\x01" + directory.to_bytes()
+
+		expected += VarInt.to_bytes(len(encoded))
+		expected += encoded
 
 		self.assertEqual(result, expected)
 
