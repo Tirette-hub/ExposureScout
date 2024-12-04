@@ -352,7 +352,6 @@ class GUIApp(tk.Tk):
 			print("alert")
 			pass
 		else:
-			print("do it")
 			if name == "" or name == None:
 				name = snap1 + " vs " + snap2
 
