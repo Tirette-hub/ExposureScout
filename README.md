@@ -21,7 +21,7 @@ The `main.py` file contains the application that is based on the package itself.
 ### GUI
 You can either launch the GUI application itself via `python3 gui.py` or from within the the CLI application calling the gui command in its menu. When launching it from the CLI application, it creates a new process but shares its [Analysis Manager](./docs/AM.md). It means that you can perform some manipulations through the CLI application then launch the GUI one and still work on the same manipulated data.
 
-<p align="center"><img src="https://github.com/Tirette-hub/ExposureScout/raw/main/images/gui.png"></p>
+<p align="center"><img src="./images/gui.png"></p>
 
 1. The snapshot memory manager is where are listed the snapshots currently available in the application memory (managed by the [Analysis Manager](./docs/AM.md)).
 2. You can Import, Dump or Export those snapshots.
