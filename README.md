@@ -16,10 +16,23 @@ One of the major advantages of this tool relies on its need of no other requirem
 This application having been imagined as modular as possible provides multiple ways to be used. Either as a standalone CLI or GUI application or even as a module itself, allowing the user to develop a simple script for plug-and-play usage.
 
 ### CLI
-The `main.py` file contains the application that is based on the package itself. You can easily run it using `python3 main.py` and simply follow the instructions on the screen. You can run personnalised snapshots, make a _diff_ between two snapshots, visualize the reports in a python _dict_ data structure, export and import both snapshots and reports (currently only BINARY solution available) and manage your application memory thanks to the [Analysis Manager](./docs/AM.md)
+The `main.py` file contains the application that is based on the package itself. You can easily run it using `python3 main.py` and simply follow the instructions on the screen. You can run personnalised snapshots, make a _diff_ between two snapshots, visualize the reports in a python _dict_ data structure, export and import both snapshots and reports (currently only BINARY solution available) and manage your application memory thanks to the [Analysis Manager](./docs/AM.md).
 
 ### GUI
-_WIP_
+You can either launch the GUI application itself via `python3 gui.py` or from within the the CLI application calling the gui command in its menu. When launching it from the CLI application, it creates a new process but shares its [Analysis Manager](./docs/AM.md). It means that you can perform some manipulations through the CLI application then launch the GUI one and still work on the same manipulated data.
+
+<p align="center"><img src="https://github.com/Tirette-hub/ExposureScout/raw/main/images/gui.png"></p>
+
+1. The snapshot memory manager is where are listed the snapshots currently available in the application memory (managed by the [Analysis Manager](./docs/AM.md)).
+2. You can Import, Dump or Export those snapshots.
+3. You can choose the collectors you want to be used in order to run a snapshot.
+4. You can choose a name for your snapshot. If you don't, it will use the date and time at the moment you press the _Run_ button. After running the snapsot, the snapshot memory manager is updated as well as the dropdown entries where you pick the snapshots in the report maker.
+5. [_WIP_] You can send quickly a snapshot to the report maker.
+6. The report maker allows you to choose the different snapshots you want to compare. You can only pick snapshots that are currently available in the snapshot memory manager. **The order in which the _snapshot1_ and _snapshot2_ are set DOES matter.** If you do not set the report id, it will set it automatically to _"[snapshot1] vs [snapshot2]"_. After running the report, the report memory manager is updated as well.
+7. The report memory manager is the same as 1 but for reports.
+8. Same as 2 but for the reports in the report memory manager.
+9. This button send the report to the report inspector.
+10. The report inspector allows you to inspect a reports. It shows a tree structure where you can show only the collector or collectible data you want.
 
 ### As a module (API)
 You can easily call the package to use its different features so you can develop scripts for very specific usage.
